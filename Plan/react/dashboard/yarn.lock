@@ -939,10 +939,10 @@ convert-source-map@^1.5.0:
   resolved "https://registry.yarnpkg.com/convert-source-map/-/convert-source-map-1.9.0.tgz#7faae62353fb4213366d0ca98358d22e8368b05f"
   integrity sha512-ASFBup0Mz1uyiIjANan1jzLQami9z1PoYSZCiiYW2FczPbenXc45FZdBZLzOT+r6+iciuEModtmCti+hjaAk0A==
 
-cookie@^1.0.1:
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/cookie/-/cookie-1.0.2.tgz#27360701532116bd3f1f9416929d176afe1e4610"
-  integrity sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==
+cookie-es@^3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/cookie-es/-/cookie-es-3.1.1.tgz#c4a8a16cf88cb5a185b23f4a61d6e9a85eb53287"
+  integrity sha512-UaXxwISYJPTr9hwQxMFYZ7kNhSXboMXP+Z3TRX6f1/NyaGPfuNUZOWP1pUEb75B2HjfklIYLVRfWiFZJyC6Npg==
 
 cosmiconfig@^7.0.0:
   version "7.1.0"
@@ -1601,13 +1601,12 @@ react-mcjsonchat@1.0.0:
   resolved "https://registry.yarnpkg.com/react-mcjsonchat/-/react-mcjsonchat-1.0.0.tgz#6a0c748b074c06a2d64a66db76e5fb2036c48a9a"
   integrity sha512-H/OYi1iRYFG2Bntj1EYWfTxOaWtIopHy6ILoaXtD3OFONK7kQnp0lXFf6sw1G3BU0DL7s8NL4+AmMCer/A5eIQ==
 
-react-router@7.18.1:
-  version "7.18.1"
-  resolved "https://registry.yarnpkg.com/react-router/-/react-router-7.18.1.tgz#61259d1594b95c1ace299ee4c57453570f0c22f1"
-  integrity sha512-GDLgg3i3uM0aeJO3Fm+TCS+sDQ7gu12T6x0qdTEzcwqEfleci7JwugVNIF3U//0FWKnJT7ptG+20B2jfDqnZAg==
+react-router@8.3.0:
+  version "8.3.0"
+  resolved "https://registry.yarnpkg.com/react-router/-/react-router-8.3.0.tgz#b7bc69c3e3833ba79ebf892aef03d62b649508f8"
+  integrity sha512-qyPMvW83jGIct3yiieisxdk9M745anqhpIMKN5m1t6yBMfgVPpt77aHOqs5fUlEJRMCGffg9BaQLH9oPVOL7xQ==
   dependencies:
-    cookie "^1.0.1"
-    set-cookie-parser "^2.6.0"
+    cookie-es "^3.1.1"
 
 react-select@5.10.2:
   version "5.10.2"
@@ -1697,11 +1696,6 @@ scheduler@^0.26.0:
   version "0.26.0"
   resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.26.0.tgz#4ce8a8c2a2095f13ea11bf9a445be50c555d6337"
   integrity sha512-NlHwttCI/l5gCPR3D1nNXtWABUmBwvZpEQiD4IXSbIDq8BzLIK/7Ir5gTFSGZDUu37K5cMNp0hFtzO38sC7gWA==
-
-set-cookie-parser@^2.6.0:
-  version "2.7.1"
-  resolved "https://registry.yarnpkg.com/set-cookie-parser/-/set-cookie-parser-2.7.1.tgz#3016f150072202dfbe90fadee053573cc89d2943"
-  integrity sha512-IOc8uWeOZgnb3ptbCURJWNjWUPcO3ZnTTdzsurqERrP6nPyv+paC55vJM0LpOlT2ne+Ix+9+CRG1MNLlyZ4GjQ==
 
 "source-map-js@>=0.6.2 <2.0.0", source-map-js@^1.2.1:
   version "1.2.1"

@@ -92,7 +92,8 @@ public class Patches {
                 new TPSTableIdPatch(),
                 new DeleteUrlOpenEventsFromExtensionComponentsPatch(),
                 new CookieTableIPLengthPatch(),
-                new DropSettingsTablePatch()
+                new DropSettingsTablePatch(),
+                new ExtensionTableProviderFormatterLengthPatch()
         };
     }
 }

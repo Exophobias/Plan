@@ -64,6 +64,9 @@ public class ExtensionTableProviderTable {
     public static final String FORMAT_4 = "format_4";
     public static final String FORMAT_5 = "format_5";
 
+    // Stores TableColumnFormat#name(), longest of which is TIME_MILLISECONDS at 17 characters.
+    public static final int FORMAT_LENGTH = 50;
+
     public static final int VALUES_FOR_PLAYER = 0;
     public static final int VALUES_FOR_SERVER = 1;
 
@@ -98,11 +101,11 @@ public class ExtensionTableProviderTable {
                 .column(ICON_3_ID, INT)
                 .column(ICON_4_ID, INT)
                 .column(ICON_5_ID, INT)
-                .column(FORMAT_1, Sql.varchar(15))
-                .column(FORMAT_2, Sql.varchar(15))
-                .column(FORMAT_3, Sql.varchar(15))
-                .column(FORMAT_4, Sql.varchar(15))
-                .column(FORMAT_5, Sql.varchar(15))
+                .column(FORMAT_1, Sql.varchar(FORMAT_LENGTH))
+                .column(FORMAT_2, Sql.varchar(FORMAT_LENGTH))
+                .column(FORMAT_3, Sql.varchar(FORMAT_LENGTH))
+                .column(FORMAT_4, Sql.varchar(FORMAT_LENGTH))
+                .column(FORMAT_5, Sql.varchar(FORMAT_LENGTH))
                 .column(TAB_ID, INT)
                 .foreignKey(PLUGIN_ID, ExtensionPluginTable.TABLE_NAME, ExtensionPluginTable.ID)
                 .foreignKey(ICON_1_ID, ExtensionIconTable.TABLE_NAME, ExtensionIconTable.ID)

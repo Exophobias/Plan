@@ -95,6 +95,14 @@ history table and no player store transaction writes one.
 
   Until that runs, `graphed = true` fails to compile with "cannot find symbol", one layer from the cause.
 
+## How much data this accumulates
+
+Extension server data refreshes **hourly** (`Time.Periodic_tasks.Extension_server_data_refresh_every`), so a
+graphed provider gathers 24 points a day, roughly 8 700 a year. The only bound is retention, and the setting
+is `Time.Thresholds.Remove_time_series_data_after`, whose 3650 day default settles a provider around 87 000
+points. That is large but years away, and the query deliberately carries no cap of its own: a cap in the query
+would silently disagree with what the setting promises. If a page ever feels heavy, that setting is the lever.
+
 ## What is graphed today
 
 - **PatriamEconomy** `goldSupply` and `burnedThisWeek`. That class's own notes say a commodity economy "drains

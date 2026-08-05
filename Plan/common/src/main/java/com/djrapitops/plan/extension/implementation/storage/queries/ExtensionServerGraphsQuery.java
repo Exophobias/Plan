@@ -101,6 +101,13 @@ public class ExtensionServerGraphsQuery implements Query<Map<Integer, ExtensionD
                 // Sorting in Java instead would mean holding every point of every series before drawing any.
                 ORDER_BY + "provider_id ASC, point_timestamp ASC";
 
+        // No time bound and no LIMIT here on purpose. The series is bounded by retention alone, and the
+        // setting that does it is Time.Thresholds.Remove_time_series_data_after -- named for time series
+        // generally rather than for TPS, which is why the prune reuses it. Extension server data refreshes
+        // hourly, so a provider gathers 24 points a day and the 3650 day default settles around 87 000
+        // points: large, but years away, and an operator who cares has one setting to turn. A cap here
+        // instead would silently disagree with what that setting promises.
+
         return db.query(new QueryStatement<>(sql, 5000) {
             @Override
             public void prepare(PreparedStatement statement) throws SQLException {

@@ -69,6 +69,7 @@ public class RemoveOldExtensionsTransaction extends ThrowawayTransaction {
         for (String table : new String[]{
                 ExtensionPlayerValueTable.TABLE_NAME,
                 ExtensionServerValueTable.TABLE_NAME,
+                ExtensionServerValueHistoryTable.TABLE_NAME,
                 ExtensionGroupsTable.TABLE_NAME
         }) {
             execute(DELETE_FROM + table + WHERE + "provider_id=" + providerID);

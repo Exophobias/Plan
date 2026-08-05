@@ -4,6 +4,7 @@ import ExtensionIcon from "./ExtensionIcon";
 import Datapoint from "../datapoint/Datapoint.tsx";
 import Masonry from 'masonry-layout'
 import ExtensionTable from "./ExtensionTable";
+import ExtensionGraph from "./ExtensionGraph";
 import {FontAwesomeIcon as Fa} from "@fortawesome/react-fontawesome";
 import End from "../layout/End";
 import {MinecraftChat} from "react-mcjsonchat";
@@ -43,6 +44,8 @@ const ExtensionTab = ({tab}) => {
                     return <ExtensionValues key={i} tab={tab}/>
                 case "TABLE":
                     return <ExtensionTables key={i} tab={tab}/>
+                case "GRAPH":
+                    return <ExtensionGraphs key={i} tab={tab}/>
                 default:
                     return ''
             }
@@ -165,6 +168,15 @@ const ExtensionTables = ({tab}) => {
     </>);
 }
 
+const ExtensionGraphs = ({tab}) => {
+    // Tolerates a tab that predates graphs: the field is absent from any cached JSON written before this.
+    return (<>
+        {(tab.graphs || []).map((graph, i) => (
+            <ExtensionGraph key={i} graph={graph}/>
+        ))}
+    </>);
+}
+
 const ExtensionCard = ({extension}) => {
     const [openTabIndex, setOpenTabIndex] = useState(0);
 
@@ -189,7 +201,10 @@ const ExtensionCard = ({extension}) => {
         </Card.Header>
         <ul className="nav nav-tabs tab-nav-right" role="tablist">
             {extension.onlyGenericTab ? '' :
-                extension.tabs.map((tab, i) => <li key={JSON.stringify(tab)} role="presentation"
+                // Keyed by tab name, not by stringifying the whole tab: a tab now carries the full
+                // point history of every graphed provider, and serialising that on every render of
+                // every card to produce a key is a lot of string for a value that never changes.
+                extension.tabs.map((tab, i) => <li key={tab.tabInformation.tabName} role="presentation"
                                                    className="nav-item col-text">
                     <button className={"nav-link col-text"
                         + (openTabIndex === i ? ' active' : '')} onClick={() => toggleTabIndex(i)}>

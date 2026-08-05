@@ -44,6 +44,7 @@ public class ProviderInformation extends ExtensionDescription {
     private final Color tableColor;         // can be null, TableProvider
     private final boolean percentage;       // affects where doubles are stored
     private final boolean component;        // affects where strings are stored
+    private final boolean graphed;          // default false, Number/Double/PercentageProvider
 
     private ProviderInformation(ProviderInformation.Builder builder) {
         super(
@@ -64,6 +65,7 @@ public class ProviderInformation extends ExtensionDescription {
         tableColor = builder.tableColor;
         percentage = builder.percentage;
         component = builder.component;
+        graphed = builder.graphed;
     }
 
     public static ProviderInformation.Builder builder(String pluginName) {
@@ -142,6 +144,18 @@ public class ProviderInformation extends ExtensionDescription {
         return component;
     }
 
+    /**
+     * Whether Plan should keep this value's history and draw it as a graph.
+     *
+     * <p>Server-level number-like providers only. Read when a gathered value is stored, to decide
+     * whether to append a history point alongside the usual overwrite.
+     *
+     * @return false unless the provider annotation opted in.
+     */
+    public boolean isGraphed() {
+        return graphed;
+    }
+
     public static class Builder {
         private final String pluginName;
         private String name;
@@ -159,6 +173,7 @@ public class ProviderInformation extends ExtensionDescription {
         private Color tableColor;             // can be null, TableProvider
         private boolean percentage;           // affects where doubles are stored
         private boolean component;            // affects where strings are stored
+        private boolean graphed;              // default false, Number/Double/PercentageProvider
 
         public Builder(String pluginName) {
             this.pluginName = pluginName;
@@ -236,6 +251,11 @@ public class ProviderInformation extends ExtensionDescription {
 
         public Builder setAsComponent() {
             component = true;
+            return this;
+        }
+
+        public Builder setGraphed(boolean graphed) {
+            this.graphed = graphed;
             return this;
         }
 

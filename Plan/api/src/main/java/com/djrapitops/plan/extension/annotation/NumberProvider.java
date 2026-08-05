@@ -109,4 +109,22 @@ public @interface NumberProvider {
      * @return false by default.
      */
     boolean showInPlayerTable() default false;
+
+    /**
+     * When the parameter is set to {@code true} Plan keeps the history of this value and draws it as a graph.
+     * <p>
+     * Plan gathers server values on a schedule and normally overwrites the previous one, so only the latest is
+     * ever kept. Setting this to {@code true} additionally appends each gathered value to a history table, and the
+     * tab renders the series as a line graph wherever {@link com.djrapitops.plan.extension.ElementOrder#GRAPH}
+     * places it.
+     * <p>
+     * Opt-in rather than automatic, because an extension with thirty numbers would otherwise produce thirty graphs
+     * and store thirty series for the ones nobody plots.
+     * <p>
+     * Server-level providers only. A method that takes a UUID is per-player and is ignored here: a series per value
+     * per player is unbounded, and no page asks for it.
+     *
+     * @return false by default.
+     */
+    boolean graphed() default false;
 }

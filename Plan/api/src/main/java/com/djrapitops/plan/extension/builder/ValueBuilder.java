@@ -133,6 +133,22 @@ public interface ValueBuilder {
     ValueBuilder format(FormatType formatType);
 
     /**
+     * Keep the history of this value and draw it as a graph.
+     * <p>
+     * Applies to server-level number, double and percentage values. Plan normally overwrites the previous value
+     * on each gather; this additionally appends the gathered value to a history table, and the tab renders the
+     * series wherever {@link com.djrapitops.plan.extension.ElementOrder#GRAPH} places it.
+     * <p>
+     * Defaulted so that an implementation written against an older version of this interface still compiles.
+     *
+     * @param graphed true to keep the history.
+     * @return This builder.
+     */
+    default ValueBuilder graphed(boolean graphed) {
+        return this;
+    }
+
+    /**
      * {@link ValueBuilder#buildString(String)} specific method, link the value to a player page.
      *
      * @return This builder.

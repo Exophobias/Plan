@@ -50,6 +50,7 @@ public class RemoveInvalidResultsTransaction extends ThrowawayTransaction {
         for (String invalidatedMethod : invalidatedMethods) {
             execute(deleteInvalidPlayerMethodResults(invalidatedMethod));
             execute(deleteInvalidServerMethodResults(invalidatedMethod));
+            execute(deleteInvalidServerMethodHistory(invalidatedMethod));
             execute(deleteInvalidMethodProvider(invalidatedMethod));
 
             execute(deleteInvalidPlayerTableResults(invalidatedMethod));
@@ -72,6 +73,23 @@ public class RemoveInvalidResultsTransaction extends ThrowawayTransaction {
     private Executable deleteInvalidServerMethodResults(String invalidMethod) {
         String sql = DELETE_FROM + ExtensionServerValueTable.TABLE_NAME +
                 WHERE + ExtensionServerValueTable.PROVIDER_ID + "=" + ExtensionProviderTable.STATEMENT_SELECT_PROVIDER_ID;
+        return new ExecStatement(sql) {
+            @Override
+            public void prepare(PreparedStatement statement) throws SQLException {
+                ExtensionProviderTable.set3PluginValuesToStatement(statement, 1, invalidMethod, pluginName, serverUUID);
+            }
+        };
+    }
+
+    /**
+     * Kept history of a provider that no longer exists.
+     *
+     * <p>Has to run before {@code deleteInvalidMethodProvider}, because the history rows carry a foreign key
+     * into the provider table and the provider row cannot go first.
+     */
+    private Executable deleteInvalidServerMethodHistory(String invalidMethod) {
+        String sql = DELETE_FROM + ExtensionServerValueHistoryTable.TABLE_NAME +
+                WHERE + ExtensionServerValueHistoryTable.PROVIDER_ID + "=" + ExtensionProviderTable.STATEMENT_SELECT_PROVIDER_ID;
         return new ExecStatement(sql) {
             @Override
             public void prepare(PreparedStatement statement) throws SQLException {

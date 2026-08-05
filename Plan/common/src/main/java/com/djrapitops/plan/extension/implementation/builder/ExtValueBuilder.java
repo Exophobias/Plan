@@ -47,6 +47,7 @@ public class ExtValueBuilder implements ValueBuilder {
     private boolean formatAsPlayerName = false;
     private FormatType formatType = FormatType.NONE;
     private Conditional conditional;
+    private boolean graphed = false;
 
     public ExtValueBuilder(String text, DataExtension extension) {
         this.text = text;
@@ -90,6 +91,12 @@ public class ExtValueBuilder implements ValueBuilder {
     @Override
     public ValueBuilder showOnTab(String tabName) {
         this.tabName = tabName;
+        return this;
+    }
+
+    @Override
+    public ValueBuilder graphed(boolean graphed) {
+        this.graphed = graphed;
         return this;
     }
 
@@ -146,7 +153,8 @@ public class ExtValueBuilder implements ValueBuilder {
                 .setPlayerName(formatAsPlayerName)
                 .setFormatType(formatType)
                 .setHidden(hidden)
-                .setCondition(conditional);
+                .setCondition(conditional)
+                .setGraphed(graphed);
 
         if (percentage) {
             builder = builder.setAsPercentage();

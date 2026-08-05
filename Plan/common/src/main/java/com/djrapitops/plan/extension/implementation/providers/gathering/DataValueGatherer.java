@@ -242,6 +242,7 @@ public class DataValueGatherer {
                     .priority(annotation.priority())
                     .showInPlayerTable(annotation.showInPlayerTable())
                     .format(annotation.format())
+                    .graphed(annotation.graphed())
                     .conditional(provider.getAnnotationOrNull(Conditional.class))
                     .showOnTab(provider.getAnnotationOrNull(Tab.class))
                     .buildNumber(() -> callMethod(provider, parameters, Long.class));
@@ -260,6 +261,7 @@ public class DataValueGatherer {
                     .description(annotation.description())
                     .priority(annotation.priority())
                     .showInPlayerTable(annotation.showInPlayerTable())
+                    .graphed(annotation.graphed())
                     .conditional(provider.getAnnotationOrNull(Conditional.class))
                     .showOnTab(provider.getAnnotationOrNull(Tab.class))
                     .buildPercentage(() -> callMethod(provider, parameters, Double.class));
@@ -278,6 +280,7 @@ public class DataValueGatherer {
                     .description(annotation.description())
                     .priority(annotation.priority())
                     .showInPlayerTable(annotation.showInPlayerTable())
+                    .graphed(annotation.graphed())
                     .conditional(provider.getAnnotationOrNull(Conditional.class))
                     .showOnTab(provider.getAnnotationOrNull(Tab.class))
                     .buildDouble(() -> callMethod(provider, parameters, Double.class));

@@ -31,11 +31,13 @@ public class ExtensionTabDataDto {
     private final TabInformationDto tabInformation; // Can be null in case where no tab was defined for provider.
     private final List<ExtensionValueDataDto> values;
     private final List<ExtensionTableDataDto> tableData;
+    private final List<ExtensionGraphDataDto> graphs;
 
     public ExtensionTabDataDto(ExtensionTabData extensionTabData) {
         this.tabInformation = new TabInformationDto(extensionTabData.getTabInformation());
         values = constructValues(extensionTabData.getValueOrder(), extensionTabData);
         tableData = extensionTabData.getTableData().stream().map(ExtensionTableDataDto::new).collect(Collectors.toList());
+        graphs = extensionTabData.getGraphData().stream().map(ExtensionGraphDataDto::new).collect(Collectors.toList());
     }
 
     public static Optional<ExtensionValueDataDto> mapToValue(ExtensionTabData tabData, String key) {
@@ -77,17 +79,21 @@ public class ExtensionTabDataDto {
         return tableData;
     }
 
+    public List<ExtensionGraphDataDto> getGraphs() {
+        return graphs;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ExtensionTabDataDto that = (ExtensionTabDataDto) o;
-        return Objects.equals(getTabInformation(), that.getTabInformation()) && Objects.equals(getValues(), that.getValues()) && Objects.equals(getTableData(), that.getTableData());
+        return Objects.equals(getTabInformation(), that.getTabInformation()) && Objects.equals(getValues(), that.getValues()) && Objects.equals(getTableData(), that.getTableData()) && Objects.equals(getGraphs(), that.getGraphs());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getTabInformation(), getValues(), getTableData());
+        return Objects.hash(getTabInformation(), getValues(), getTableData(), getGraphs());
     }
 
     @Override
@@ -96,6 +102,7 @@ public class ExtensionTabDataDto {
                 "tabInformation=" + tabInformation +
                 ", values=" + values +
                 ", tableData=" + tableData +
+                ", graphs=" + graphs +
                 '}';
     }
 }

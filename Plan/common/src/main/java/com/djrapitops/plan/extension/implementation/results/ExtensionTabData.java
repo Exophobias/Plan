@@ -39,11 +39,10 @@ public class ExtensionTabData implements Comparable<ExtensionTabData> {
     private final Map<String, ExtensionComponentData> componentData;
 
     private final List<ExtensionTableData> tableData;
+    private final List<ExtensionGraphData> graphData;
     private final List<ExtensionDescription> descriptions;
 
     private List<String> order;
-
-    // Table and Graph data will be added later.
 
     public ExtensionTabData(TabInformation tabInformation) {
         this.tabInformation = tabInformation;
@@ -56,6 +55,7 @@ public class ExtensionTabData implements Comparable<ExtensionTabData> {
         componentData = new HashMap<>();
 
         tableData = new ArrayList<>();
+        graphData = new ArrayList<>();
         descriptions = new ArrayList<>();
     }
 
@@ -93,6 +93,10 @@ public class ExtensionTabData implements Comparable<ExtensionTabData> {
 
     public List<ExtensionTableData> getTableData() {
         return tableData;
+    }
+
+    public List<ExtensionGraphData> getGraphData() {
+        return graphData;
     }
 
     /**
@@ -134,6 +138,7 @@ public class ExtensionTabData implements Comparable<ExtensionTabData> {
         this.componentData.putAll(other.componentData);
 
         this.tableData.addAll(other.tableData);
+        this.graphData.addAll(other.graphData);
 
         createOrderingList();
     }
@@ -211,9 +216,15 @@ public class ExtensionTabData implements Comparable<ExtensionTabData> {
             return this;
         }
 
+        public Builder putGraphData(ExtensionGraphData extensionGraphData) {
+            data.graphData.add(extensionGraphData);
+            return this;
+        }
+
         public ExtensionTabData build() {
             data.createOrderingList();
             Collections.sort(data.tableData);
+            Collections.sort(data.graphData);
             return data;
         }
     }

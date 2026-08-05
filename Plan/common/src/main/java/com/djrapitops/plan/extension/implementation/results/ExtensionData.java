@@ -54,6 +54,9 @@ public class ExtensionData implements Comparable<ExtensionData> {
             for (ExtensionTableData table : tab.getTableData()) {
                 if (table.isWideTable()) return true;
             }
+            // A graph is wide by nature. Without this an extension whose only large element is a graph is
+            // laid out as a narrow card and the series is squeezed into a third of the row.
+            if (!tab.getGraphData().isEmpty()) return true;
         }
         return false;
     }

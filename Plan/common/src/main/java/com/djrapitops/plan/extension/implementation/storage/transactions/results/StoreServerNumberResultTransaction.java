@@ -43,17 +43,26 @@ public class StoreServerNumberResultTransaction extends ThrowawayTransaction {
     private final String providerName;
 
     private final long value;
+    private final boolean graphed;
+    private final long timestamp;
 
     public StoreServerNumberResultTransaction(ProviderInformation information, Parameters parameters, long value) {
         this.pluginName = information.getPluginName();
         this.providerName = information.getName();
         this.serverUUID = parameters.getServerUUID();
         this.value = value;
+        this.graphed = information.isGraphed();
+        this.timestamp = System.currentTimeMillis();
     }
 
     @Override
     protected void performOperations() {
         execute(storeValue());
+        if (graphed) {
+            // Appended as well as, never instead of: the single current value is what every existing
+            // reader of this provider expects to find, and the series is an addition to it.
+            execute(ExtensionValueHistory.append(pluginName, providerName, serverUUID, timestamp, value, null));
+        }
     }
 
     private Executable storeValue() {

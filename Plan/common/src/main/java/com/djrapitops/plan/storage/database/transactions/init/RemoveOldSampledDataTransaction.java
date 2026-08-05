@@ -23,6 +23,9 @@ import com.djrapitops.plan.storage.database.queries.objects.TPSQueries;
 import com.djrapitops.plan.storage.database.sql.tables.PingTable;
 import com.djrapitops.plan.storage.database.sql.tables.ServerTable;
 import com.djrapitops.plan.storage.database.sql.tables.TPSTable;
+import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionPluginTable;
+import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionProviderTable;
+import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionServerValueHistoryTable;
 import com.djrapitops.plan.storage.database.transactions.ExecStatement;
 import com.djrapitops.plan.storage.database.transactions.Executable;
 import com.djrapitops.plan.storage.database.transactions.ThrowawayTransaction;
@@ -61,12 +64,45 @@ public class RemoveOldSampledDataTransaction extends ThrowawayTransaction {
         try {
             execute(cleanTPSTable(allTimePeak.orElse(-1)));
             execute(cleanPingTable());
+            execute(cleanExtensionValueHistoryTable());
         } catch (DBOpException e) {
             if (e.isModifiedSinceLastReadViolation()) {
                 return;
             }
             throw e;
         }
+    }
+
+    /**
+     * Drops graph points older than the TPS retention window.
+     *
+     * <p>Reuses that setting rather than adding one of its own: both are sampled series kept only so a page can
+     * draw them, they are gathered on comparable schedules, and an operator who has decided how far back the
+     * server's own graphs should reach has already answered this question. A second setting would let the two
+     * disagree, and nothing good comes of a plugin graph that outlives the TPS graph beside it.
+     *
+     * <p>Scoped to this server, like the TPS and ping cleans above it. Several servers can share one database,
+     * each running this transaction on its own schedule with its own retention setting, so an unscoped delete
+     * would let whichever node cleaned up most aggressively destroy every other node's history. A point has no
+     * server column of its own, so the scope comes through its provider's plugin.
+     */
+    private Executable cleanExtensionValueHistoryTable() {
+        String selectProviderIdsOfServer = SELECT + "p." + ExtensionProviderTable.ID +
+                FROM + ExtensionProviderTable.TABLE_NAME + " p" +
+                INNER_JOIN + ExtensionPluginTable.TABLE_NAME + " pl on pl." + ExtensionPluginTable.ID + "=p." + ExtensionProviderTable.PLUGIN_ID +
+                WHERE + ExtensionPluginTable.SERVER_UUID + "=?";
+
+        String sql = DELETE_FROM + ExtensionServerValueHistoryTable.TABLE_NAME +
+                WHERE + ExtensionServerValueHistoryTable.TIMESTAMP + "<?" +
+                AND + ExtensionServerValueHistoryTable.PROVIDER_ID + " IN (" + selectProviderIdsOfServer + ')';
+
+        return new ExecStatement(sql) {
+            @Override
+            public void prepare(PreparedStatement statement) throws SQLException {
+                statement.setLong(1, System.currentTimeMillis() - deleteTPSOlderThanMs);
+                statement.setString(2, serverUUID.toString());
+            }
+        };
     }
 
     private Executable cleanTPSTable(int allTimePlayerPeak) {

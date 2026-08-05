@@ -71,6 +71,7 @@ public class RemoveServerTransaction extends ThrowawayTransaction {
         String in = " IN (";
         executeServerRemoval(DELETE_FROM + ExtensionGroupsTable.TABLE_NAME + WHERE + ExtensionGroupsTable.PROVIDER_ID + in + selectProviderIdsOfServer + ')');
         executeServerRemoval(DELETE_FROM + ExtensionServerValueTable.TABLE_NAME + WHERE + ExtensionServerValueTable.PROVIDER_ID + in + selectProviderIdsOfServer + ')');
+        executeServerRemoval(DELETE_FROM + ExtensionServerValueHistoryTable.TABLE_NAME + WHERE + ExtensionServerValueHistoryTable.PROVIDER_ID + in + selectProviderIdsOfServer + ')');
         executeServerRemoval(DELETE_FROM + ExtensionPlayerValueTable.TABLE_NAME + WHERE + ExtensionPlayerValueTable.PROVIDER_ID + in + selectProviderIdsOfServer + ')');
         executeServerRemoval(DELETE_FROM + ExtensionServerTableValueTable.TABLE_NAME + WHERE + ExtensionServerTableValueTable.TABLE_ID + in + selectTableIdsOfServer + ')');
         executeServerRemoval(DELETE_FROM + ExtensionPlayerTableValueTable.TABLE_NAME + WHERE + ExtensionPlayerTableValueTable.TABLE_ID + in + selectTableIdsOfServer + ')');

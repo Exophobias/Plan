@@ -44,6 +44,8 @@ public class StoreServerDoubleResultTransaction extends ThrowawayTransaction {
 
     private final double value;
     private final boolean percentage;
+    private final boolean graphed;
+    private final long timestamp;
 
     public StoreServerDoubleResultTransaction(ProviderInformation info, Parameters parameters, double value) {
         this.pluginName = info.getPluginName();
@@ -51,11 +53,17 @@ public class StoreServerDoubleResultTransaction extends ThrowawayTransaction {
         this.percentage = info.isPercentage();
         this.serverUUID = parameters.getServerUUID();
         this.value = value;
+        this.graphed = info.isGraphed();
+        this.timestamp = System.currentTimeMillis();
     }
 
     @Override
     protected void performOperations() {
         execute(storeValue());
+        if (graphed) {
+            // Percentages come through here too, so one branch covers both annotations.
+            execute(ExtensionValueHistory.append(pluginName, providerName, serverUUID, timestamp, null, value));
+        }
     }
 
     private Executable storeValue() {

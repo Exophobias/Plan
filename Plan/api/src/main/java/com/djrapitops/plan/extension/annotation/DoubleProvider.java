@@ -97,4 +97,12 @@ public @interface DoubleProvider {
      * @return false by default.
      */
     boolean showInPlayerTable() default false;
+
+    /**
+     * When the parameter is set to {@code true} Plan keeps the history of this value and draws it as a graph.
+     *
+     * @return false by default.
+     * @see NumberProvider#graphed() for what this costs and why it is opt-in.
+     */
+    boolean graphed() default false;
 }

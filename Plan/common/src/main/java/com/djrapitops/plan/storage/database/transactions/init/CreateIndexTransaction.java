@@ -21,6 +21,7 @@ import com.djrapitops.plan.storage.database.queries.schema.MySQLSchemaQueries;
 import com.djrapitops.plan.storage.database.sql.tables.*;
 import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionPlayerTableValueTable;
 import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionServerTableValueTable;
+import com.djrapitops.plan.storage.database.sql.tables.extension.ExtensionServerValueHistoryTable;
 import com.djrapitops.plan.storage.database.transactions.Transaction;
 import org.apache.commons.text.TextStringBuilder;
 
@@ -66,6 +67,13 @@ public class CreateIndexTransaction extends Transaction {
         createIndex(ExtensionServerTableValueTable.TABLE_NAME, "plan_extension_server_table_value_server_index",
                 ExtensionServerTableValueTable.TABLE_ID,
                 ExtensionServerTableValueTable.SERVER_UUID);
+        // Both things done to graph history read it in this order: the query is
+        // ORDER BY provider_id, timestamp and the prune is WHERE timestamp < ? AND provider_id IN (...).
+        // The foreign key already indexes provider_id on InnoDB but not on SQLite, and neither covers the
+        // timestamp, so without this the sort is a filesort over the whole table on every cache refresh.
+        createIndex(ExtensionServerValueHistoryTable.TABLE_NAME, "plan_extension_server_value_history_index",
+                ExtensionServerValueHistoryTable.PROVIDER_ID,
+                ExtensionServerValueHistoryTable.TIMESTAMP);
 
         createIndex(UserInfoTable.TABLE_NAME, "plan_user_info_server_user",
                 UserInfoTable.SERVER_ID,

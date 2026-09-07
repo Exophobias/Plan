@@ -16,6 +16,7 @@
  */
 package com.djrapitops.plan.storage.database.transactions.commands;
 
+import com.djrapitops.plan.extension.implementation.providers.gathering.ExtensionMetadataStorage;
 import com.djrapitops.plan.storage.database.sql.tables.*;
 import com.djrapitops.plan.storage.database.sql.tables.extension.*;
 import com.djrapitops.plan.storage.database.sql.tables.webuser.*;
@@ -56,6 +57,8 @@ public class RemoveEverythingTransaction extends Patch {
         clearTable(SecurityTable.TABLE_NAME);
         clearTable(ServerTable.TABLE_NAME);
         clearTable(CookieTable.TABLE_NAME);
+        clearTable(StatisticValueTable.TABLE_NAME);
+        clearTable(StatisticTable.TABLE_NAME);
         clearTable(ExtensionPlayerValueTable.TABLE_NAME);
         clearTable(ExtensionServerValueTable.TABLE_NAME);
         clearTable(ExtensionServerValueHistoryTable.TABLE_NAME);
@@ -73,6 +76,8 @@ public class RemoveEverythingTransaction extends Patch {
         execute(SessionsTable.TemporaryIdLookupTable.DROP_TABLE_STATEMENT);
 
         executeOther(new StoreJoinAddressTransaction(JoinAddressTable.DEFAULT_VALUE_FOR_LOOKUP));
+
+        ExtensionMetadataStorage.invalidateAll();
     }
 
     private void clearTable(String tableName) {

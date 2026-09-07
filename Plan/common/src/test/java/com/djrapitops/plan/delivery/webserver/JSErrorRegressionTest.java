@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static com.djrapitops.plan.delivery.export.ExportTestUtilities.assertNoLogs;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * This test class is for catching any JavaScript errors.
@@ -160,12 +161,14 @@ class JSErrorRegressionTest {
     })
     void linkFunctionRegressionTest(String address, ChromeDriver driver) {
         driver.get(address);
+        SeleniumExtension.waitForElementToBeVisible(By.className("load-in"), driver);
 
         List<String> anchorLinks = getLinks(driver, 0);
+        assertFalse(anchorLinks.isEmpty(), () -> "No internal links found at " + address);
 
         for (String href : anchorLinks) {
-            driver.get(address);
-            SeleniumExtension.waitForPageLoadForSeconds(3, driver);
+            driver.get(href);
+            SeleniumExtension.waitForElementToBeVisible(By.className("load-in"), driver);
 
             assertNoLogs(driver, "Page link '" + address + "'->'" + href + "'");
             System.out.println("'" + address + "' has link to " + href);

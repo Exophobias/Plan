@@ -102,6 +102,9 @@ shadowJar {
     archiveClassifier.set("")
 
     mergeServiceFiles()
+    filesMatching('META-INF/services/**') {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 }
 
 tasks.assemble.dependsOn tasks.shadowJar

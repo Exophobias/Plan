@@ -11,7 +11,9 @@ compileJava {
     options.release = 8
 }
 
-def apiVersion = "5.9-R0.1"
+// Patriam's graph annotations require its fork API. Keep local publications distinct from the
+// upstream release coordinate while leaving upstream publishing's default version unchanged.
+def apiVersion = providers.gradleProperty("patriamApiVersion").orElse("5.9-R0.1").get()
 
 publishing {
     repositories {

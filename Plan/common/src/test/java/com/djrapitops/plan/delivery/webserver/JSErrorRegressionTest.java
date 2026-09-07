@@ -41,6 +41,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -160,8 +161,12 @@ class JSErrorRegressionTest {
             "http://localhost:" + TEST_PORT_NUMBER + "/query"
     })
     void linkFunctionRegressionTest(String address, ChromeDriver driver) {
+        // The responsive sidebar is not mounted below 1350px, including Chrome's
+        // default headless viewport. Exercise the actual desktop navigation.
+        driver.manage().window().setSize(new Dimension(1600, 1000));
         driver.get(address);
         SeleniumExtension.waitForElementToBeVisible(By.className("load-in"), driver);
+        SeleniumExtension.waitForElementToBeVisible(By.id("accordionSidebar"), driver);
 
         List<String> anchorLinks = getLinks(driver, 0);
         assertFalse(anchorLinks.isEmpty(), () -> "No internal links found at " + address);

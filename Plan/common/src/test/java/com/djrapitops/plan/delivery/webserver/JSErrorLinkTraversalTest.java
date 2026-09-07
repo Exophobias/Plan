@@ -10,6 +10,7 @@ package com.djrapitops.plan.delivery.webserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -32,6 +33,7 @@ class JSErrorLinkTraversalTest {
     private static final String SECOND = "http://localhost:9091/network";
     private final ChromeDriver driver = mock(ChromeDriver.class);
     private final Logs logs = mock(Logs.class);
+    private final WebDriver.Window window = mock(WebDriver.Window.class);
     private final AtomicReference<String> currentPage = new AtomicReference<>();
 
     @BeforeEach
@@ -39,11 +41,13 @@ class JSErrorLinkTraversalTest {
         WebDriver.Options options = mock(WebDriver.Options.class);
         when(driver.manage()).thenReturn(options);
         when(options.logs()).thenReturn(logs);
+        when(options.window()).thenReturn(window);
         when(logs.get(LogType.BROWSER)).thenReturn(new LogEntries(List.of()));
         when(driver.executeScript("return document.readyState")).thenReturn("complete");
         WebElement loadedPage = mock(WebElement.class);
         when(loadedPage.isDisplayed()).thenReturn(true);
         when(driver.findElement(By.className("load-in"))).thenReturn(loadedPage);
+        when(driver.findElement(By.id("accordionSidebar"))).thenReturn(loadedPage);
         doAnswer(call -> {
             currentPage.set(call.getArgument(0));
             return null;
@@ -63,7 +67,8 @@ class JSErrorLinkTraversalTest {
 
         new JSErrorRegressionTest().linkFunctionRegressionTest(SOURCE, driver);
 
-        var navigation = inOrder(driver);
+        var navigation = inOrder(window, driver);
+        navigation.verify(window).setSize(new Dimension(1600, 1000));
         navigation.verify(driver).get(SOURCE);
         navigation.verify(driver).get(FIRST);
         navigation.verify(driver).get(SECOND);

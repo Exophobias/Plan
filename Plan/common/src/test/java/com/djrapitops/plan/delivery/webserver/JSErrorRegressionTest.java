@@ -35,6 +35,7 @@ import com.djrapitops.plan.storage.database.transactions.events.StoreSessionTran
 import com.djrapitops.plan.storage.database.transactions.events.StoreWorldNameTransaction;
 import extension.FullSystemExtension;
 import extension.SeleniumExtension;
+import org.awaitility.Awaitility;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.logging.LogType;
 import utilities.RandomData;
@@ -55,6 +57,8 @@ import java.util.stream.Stream;
 
 import static com.djrapitops.plan.delivery.export.ExportTestUtilities.assertNoLogs;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This test class is for catching any JavaScript errors.
@@ -94,7 +98,7 @@ class JSErrorRegressionTest {
         ServerUUID serverUUID = system.getServerInfo().getServerUUID();
         database.executeInTransaction(
                 DataStoreQueries.storeTPS(serverUUID,
-                        RandomData.randomTPSAtDate(System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(5)))).join();
+                        SparsePerformanceFixture.recentSample(System.currentTimeMillis()))).join();
     }
 
     @AfterAll
@@ -143,7 +147,7 @@ class JSErrorRegressionTest {
                 driver.get(address);
                 SeleniumExtension.waitForPageLoadForSeconds(5, driver);
                 SeleniumExtension.waitForElementToBeVisible(By.className("load-in"), driver);
-                assertNoLogs(driver.manage().logs().get(LogType.BROWSER).getAll(), address);
+                assertNoUnexpectedLogs(driver, address);
             } finally {
                 locale.clear(); // Reset locale after test
             }
@@ -175,9 +179,43 @@ class JSErrorRegressionTest {
             driver.get(href);
             SeleniumExtension.waitForElementToBeVisible(By.className("load-in"), driver);
 
-            assertNoLogs(driver, "Page link '" + address + "'->'" + href + "'");
+            assertNoUnexpectedLogs(driver, "Page link '" + address + "'->'" + href + "'");
             System.out.println("'" + address + "' has link to " + href);
         }
+    }
+
+    @Test
+    void sparsePerformanceHistoryDisplaysUnavailableValues(ChromeDriver driver) {
+        driver.manage().window().setSize(new Dimension(1600, 1000));
+        String address = "http://localhost:" + TEST_PORT_NUMBER + "/server/Server%201/performance";
+        driver.get(address);
+        SeleniumExtension.waitForElementToBeVisible(By.id("performance-as-numbers"), driver);
+        Awaitility.await("sparse disk history renders '-' and recent numeric values")
+                .atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                    List<WebElement> rows = driver.findElements(By.xpath(
+                            "//*[@id='performance-as-numbers']//tr[td//*[contains(@class,'col-disk')]]"));
+                    assertEquals(2, rows.size(), "Both minimum and maximum free-disk rows must be present");
+                    for (WebElement row : rows) {
+                        List<WebElement> cells = row.findElements(By.tagName("td"));
+                        assertEquals(7, cells.size());
+                        for (int historical : new int[]{2, 3, 4}) {
+                            assertEquals("-", cells.get(historical).getText());
+                        }
+                        for (int recent : new int[]{1, 5, 6}) {
+                            assertTrue(cells.get(recent).getText().matches("8(?:\\.0+)? GB"),
+                                    "The populated recent 8000 MB disk sample must render 8 GB");
+                        }
+                    }
+                });
+        assertNoUnexpectedLogs(driver, address);
+    }
+
+    private static void assertNoUnexpectedLogs(ChromeDriver driver, String address) {
+        // The API intentionally returns 404 for absent samples; the table renders
+        // '-'. Permit only this fixture's exact empty combinations, whose visible
+        // fallback is also checked above. Other HTTP errors and JS errors fail.
+        assertNoLogs(driver.manage().logs().get(LogType.BROWSER).getAll().stream()
+                .filter(entry -> !SparsePerformanceFixture.isExpectedMissingMetric(entry)).toList(), address);
     }
 
     private List<String> getLinks(ChromeDriver driver, int attempt) {

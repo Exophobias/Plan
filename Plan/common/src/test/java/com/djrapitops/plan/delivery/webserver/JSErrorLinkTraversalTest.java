@@ -9,6 +9,8 @@ package com.djrapitops.plan.delivery.webserver;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.WebDriver;
@@ -25,6 +27,7 @@ import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
 class JSErrorLinkTraversalTest {
@@ -98,5 +101,45 @@ class JSErrorLinkTraversalTest {
         assertTrue(failure.getMessage().contains(SECOND));
         assertTrue(failure.getMessage().contains("destination script failed"));
         verify(driver).get(SECOND);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201",
+            "server=Server%201&type=CPU_AVERAGE&activityType=IDLE&afterMillisAgo=86400000"
+    })
+    void permitsOnlyTheSparseFixturesExpectedEmptyResponses(String query) {
+        assertTrue(SparsePerformanceFixture.isExpectedMissingMetric(resourceFailure("/v1/datapoint?" + query, 404)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Other",
+            "type=UNKNOWN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201",
+            "type=DISK_MIN&afterMillisAgo=86400000&server=Server%201",
+            "type=CPU_AVERAGE&activityType=ACTIVE&afterMillisAgo=86400000&server=Server%201",
+            "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201&server=Other",
+            "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=1&server=Server%201",
+            "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201&unexpected=1"
+    })
+    void unexpectedMetricServerWindowAndRecentData404sStillFail(String query) {
+        assertFalse(SparsePerformanceFixture.isExpectedMissingMetric(resourceFailure("/v1/datapoint?" + query, 404)));
+    }
+
+    @Test
+    void serverErrorsWrongRoutesAndJavascriptErrorsRemainFailures() {
+        String path = "/v1/datapoint?type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201";
+        assertFalse(SparsePerformanceFixture.isExpectedMissingMetric(resourceFailure(path, 500)));
+        assertFalse(SparsePerformanceFixture.isExpectedMissingMetric(resourceFailure(path.replace("datapoint", "missing-route"), 404)));
+        assertFalse(SparsePerformanceFixture.isExpectedMissingMetric(new LogEntry(Level.SEVERE, 1,
+                "Uncaught TypeError: " + resourceFailure(path, 404).getMessage())));
+        assertFalse(SparsePerformanceFixture.isExpectedMissingMetric(new LogEntry(Level.SEVERE, 1,
+                resourceFailure(path, 404).getMessage().replace("localhost:9091", "elsewhere:9091"))));
+    }
+
+    private LogEntry resourceFailure(String path, int status) {
+        return new LogEntry(Level.SEVERE, 1, "http://localhost:9091" + path
+                + " - Failed to load resource: the server responded with a status of " + status
+                + (status == 404 ? " (Not Found)" : " (Internal Server Error)"));
     }
 }

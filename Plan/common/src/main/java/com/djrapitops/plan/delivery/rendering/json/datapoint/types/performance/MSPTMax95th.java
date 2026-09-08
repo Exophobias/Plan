@@ -21,8 +21,6 @@ import com.djrapitops.plan.delivery.domain.datatransfer.GenericFilter;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.Datapoint;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.DatapointType;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.SupportedFilters;
-import com.djrapitops.plan.settings.config.PlanConfig;
-import com.djrapitops.plan.settings.config.paths.DisplaySettings;
 import com.djrapitops.plan.storage.database.DBSystem;
 import com.djrapitops.plan.storage.database.queries.objects.TPSQueries;
 
@@ -31,19 +29,17 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Datapoint for looking up Average MSPT within the timeframe.
+ * Datapoint for looking up Maximum 95th percentile MSPT within the timeframe.
  *
  * @author AuroraLS3
  */
 @Singleton
 public class MSPTMax95th implements Datapoint<Double> {
 
-    private final PlanConfig config;
     private final DBSystem dbSystem;
 
     @Inject
-    public MSPTMax95th(PlanConfig config, DBSystem dbSystem) {
-        this.config = config;
+    public MSPTMax95th(DBSystem dbSystem) {
         this.dbSystem = dbSystem;
     }
 
@@ -54,10 +50,9 @@ public class MSPTMax95th implements Datapoint<Double> {
 
     @Override
     public Optional<Double> getValue(GenericFilter filter) {
-        double average = dbSystem.getDatabase().query(TPSQueries.max95thMSPTWhenLowTps(
-                filter.getAfter(), filter.getBefore(), filter.getServerUUIDs(),
-                config.get(DisplaySettings.GRAPH_TPS_THRESHOLD_MED)));
-        return average != -1.0 ? Optional.of(average) : Optional.empty();
+        double maximum = dbSystem.getDatabase().query(TPSQueries.max95thMSPT(
+                filter.getAfter(), filter.getBefore(), filter.getServerUUIDs()));
+        return maximum != -1.0 ? Optional.of(maximum) : Optional.empty();
     }
 
     @Override

@@ -17,6 +17,11 @@
 package com.djrapitops.plan.storage.database.queries;
 
 import com.djrapitops.plan.delivery.domain.DateObj;
+import com.djrapitops.plan.delivery.domain.datatransfer.GenericFilter;
+import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95th;
+import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95thWithLowTPS;
+import com.djrapitops.plan.delivery.web.resolver.request.URIQuery;
+import com.djrapitops.plan.settings.config.paths.DisplaySettings;
 import com.djrapitops.plan.delivery.domain.mutators.TPSMutator;
 import com.djrapitops.plan.gathering.domain.TPS;
 import com.djrapitops.plan.gathering.domain.builders.TPSBuilder;
@@ -46,6 +51,30 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public interface TPSQueriesTest extends DatabaseTestPreparer {
+
+    @Test
+    default void generalMsptMaximumIncludesNormalTpsSamples() {
+        config().set(DisplaySettings.GRAPH_TPS_THRESHOLD_MED, 10.0);
+        TPS normal = new TPS(1000, 20, 2, 25, 1000, 40, 20, 8000);
+        normal.setMspt95thPercentile(80.0);
+        TPS low = new TPS(2000, 5, 2, 25, 1000, 40, 20, 8000);
+        low.setMspt95thPercentile(40.0);
+        execute(DataStoreQueries.storeTPS(serverUUID(), normal));
+        execute(DataStoreQueries.storeTPS(serverUUID(), low));
+        forcePersistenceCheck();
+
+        MSPTMax95th general = new MSPTMax95th(dbSystem());
+        MSPTMax95thWithLowTPS onlyLow = new MSPTMax95thWithLowTPS(config(), dbSystem());
+        GenericFilter both = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=0&before=2500"));
+        assertEquals(Optional.of(80.0), general.getValue(both));
+        assertEquals(Optional.of(40.0), onlyLow.getValue(both));
+
+        GenericFilter normalOnly = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=0&before=1500"));
+        assertEquals(Optional.of(80.0), general.getValue(normalOnly));
+        assertTrue(onlyLow.getValue(normalOnly).isEmpty());
+        GenericFilter empty = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=3000&before=4000"));
+        assertTrue(general.getValue(empty).isEmpty());
+    }
 
     @Test
     default void tpsIsStored() {

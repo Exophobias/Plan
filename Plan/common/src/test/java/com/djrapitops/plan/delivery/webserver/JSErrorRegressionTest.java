@@ -26,6 +26,7 @@ import com.djrapitops.plan.gathering.domain.DataMap;
 import com.djrapitops.plan.gathering.domain.FinishedSession;
 import com.djrapitops.plan.identification.ServerUUID;
 import com.djrapitops.plan.settings.config.paths.WebserverSettings;
+import com.djrapitops.plan.settings.config.paths.DisplaySettings;
 import com.djrapitops.plan.settings.locale.Locale;
 import com.djrapitops.plan.storage.database.DBSystem;
 import com.djrapitops.plan.storage.database.Database;
@@ -76,7 +77,8 @@ class JSErrorRegressionTest {
     @BeforeAll
     static void setUpClass(PlanSystem system) {
         system.getConfigSystem().getConfig()
-                .set(WebserverSettings.PORT, TEST_PORT_NUMBER);
+                .set(WebserverSettings.PORT, TEST_PORT_NUMBER)
+                .set(DisplaySettings.GRAPH_TPS_THRESHOLD_MED, 10.0);
         system.enable();
         savePlayerData(system);
         saveServerData(system);
@@ -190,6 +192,16 @@ class JSErrorRegressionTest {
         String address = "http://localhost:" + TEST_PORT_NUMBER + "/server/Server%201/performance";
         driver.get(address);
         SeleniumExtension.waitForElementToBeVisible(By.id("performance-as-numbers"), driver);
+        Object response = driver.executeAsyncScript("""
+                const done = arguments[arguments.length - 1];
+                fetch(arguments[0]).then(async response => done({status: response.status, body: await response.json()}))
+                    .catch(error => done({error: String(error)}));
+                """, "http://localhost:" + TEST_PORT_NUMBER
+                + "/v1/datapoint?type=MSPT_MAX_95TH&afterMillisAgo=86400000&server=Server%201");
+        assertTrue(response instanceof Map<?, ?>, "Recent MSPT request must return a response");
+        Map<?, ?> result = (Map<?, ?>) response;
+        assertEquals(200L, result.get("status"), "Recent ordinary MSPT maximum must not become no-data");
+        assertEquals(80.0, ((Number) ((Map<?, ?>) result.get("body")).get("value")).doubleValue());
         Awaitility.await("sparse disk history renders '-' and recent numeric values")
                 .atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
                     List<WebElement> rows = driver.findElements(By.xpath(

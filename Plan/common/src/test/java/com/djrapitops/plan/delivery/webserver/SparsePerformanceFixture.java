@@ -51,8 +51,10 @@ final class SparsePerformanceFixture {
                 queries.add(Map.copyOf(query));
             }
         }
-        // The one sample has two players, so there are no idle samples either.
-        for (String metric : new String[]{"CPU_AVERAGE:IDLE", "MSPT_AVERAGE:IDLE"}) {
+        // The one sample has two players and TPS 15 above the fixture's explicit
+        // threshold 10, so idle and low-TPS-only aggregates have no samples either.
+        for (String metric : new String[]{"CPU_AVERAGE:IDLE", "MSPT_AVERAGE:IDLE",
+                "MSPT_AVERAGE_LOW_TPS", "MSPT_MAX_95TH_LOW_TPS"}) {
             for (int days : new int[]{1, 7, 30}) {
                 queries.add(Map.copyOf(query(metric, DAY * days)));
             }

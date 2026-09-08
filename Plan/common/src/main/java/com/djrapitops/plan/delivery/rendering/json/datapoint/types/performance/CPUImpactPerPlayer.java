@@ -57,6 +57,8 @@ public class CPUImpactPerPlayer implements Datapoint<Double> {
                 filter.getServerUUIDs(),
                 OnlineActivityType.IDLE
         ));
+        // An absent idle baseline is not a measured CPU value to subtract.
+        if (averageWhenIdle == -1.0) return Optional.empty();
         double average = dbSystem.getDatabase().query(TPSQueries.averageCpuPerPlayer(filter.getAfter(), filter.getBefore(), filter.getServerUUIDs(), averageWhenIdle));
         return average != -1.0 ? Optional.of(average / 100.0) : Optional.empty();
     }

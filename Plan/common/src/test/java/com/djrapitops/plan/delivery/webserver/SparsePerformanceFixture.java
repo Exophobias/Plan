@@ -53,8 +53,9 @@ final class SparsePerformanceFixture {
         }
         // The one sample has two players and TPS 15 above the fixture's explicit
         // threshold 10, so idle and low-TPS-only aggregates have no samples either.
+        // CPU impact also needs an observed idle baseline, which this fixture lacks.
         for (String metric : new String[]{"CPU_AVERAGE:IDLE", "MSPT_AVERAGE:IDLE",
-                "MSPT_AVERAGE_LOW_TPS", "MSPT_MAX_95TH_LOW_TPS"}) {
+                "MSPT_AVERAGE_LOW_TPS", "MSPT_MAX_95TH_LOW_TPS", "CPU_IMPACT_PER_PLAYER"}) {
             for (int days : new int[]{1, 7, 30}) {
                 queries.add(Map.copyOf(query(metric, DAY * days)));
             }

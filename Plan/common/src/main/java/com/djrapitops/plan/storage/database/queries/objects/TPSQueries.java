@@ -65,7 +65,8 @@ public class TPSQueries {
                     max("t." + ENTITIES) + " as " + ENTITIES + ',' +
                     max("t." + CHUNKS) + " as " + CHUNKS + ',' +
                     max("t." + FREE_DISK) + " as " + FREE_DISK + ',' +
-                    min("t." + MSPT_AVERAGE) + " as " + MSPT_AVERAGE + ',' +
+                    // Retain the slowest sample, like the TPS minimum and CPU maximum.
+                    max("t." + MSPT_AVERAGE) + " as " + MSPT_AVERAGE + ',' +
                     max("t." + MSPT_95TH_PERCENTILE) + " as " + MSPT_95TH_PERCENTILE + ',' +
                     avg("t." + MSPT_JITTER_AVERAGE) + " as " + MSPT_JITTER_AVERAGE + ',' +
                     max("t." + MSPT_JITTER_MAX) + " as " + MSPT_JITTER_MAX +
@@ -735,7 +736,7 @@ public class TPSQueries {
     }
 
     public static Query<Long> averageChunksPerPlayer(long after, long before, List<ServerUUID> serverUUIDs) {
-        String sql = SELECT + "AVG(" + CHUNKS + "/" + PLAYERS_ONLINE + ") as average" + FROM + TABLE_NAME + " t" +
+        String sql = SELECT + "AVG(" + CHUNKS + "*1.0/" + PLAYERS_ONLINE + ") as average" + FROM + TABLE_NAME + " t" +
                 INNER_JOIN + ServerTable.TABLE_NAME + " s ON s." + ServerTable.ID + "=t." + SERVER_ID +
                 WHERE + (serverUUIDs.isEmpty()
                 ? ""

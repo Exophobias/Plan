@@ -107,7 +107,8 @@ class JSErrorLinkTraversalTest {
     @ValueSource(strings = {
             "type=DISK_MIN&afterMillisAgo=1209600000&beforeMillisAgo=604800000&server=Server%201",
             "server=Server%201&type=CPU_AVERAGE&activityType=IDLE&afterMillisAgo=86400000",
-            "server=Server%201&type=MSPT_MAX_95TH_LOW_TPS&afterMillisAgo=86400000"
+            "server=Server%201&type=MSPT_MAX_95TH_LOW_TPS&afterMillisAgo=86400000",
+            "server=Server%201&type=CPU_IMPACT_PER_PLAYER&afterMillisAgo=86400000"
     })
     void permitsOnlyTheSparseFixturesExpectedEmptyResponses(String query) {
         assertTrue(SparsePerformanceFixture.isExpectedMissingMetric(resourceFailure("/v1/datapoint?" + query, 404)));

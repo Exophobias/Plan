@@ -202,6 +202,12 @@ class JSErrorRegressionTest {
         Map<?, ?> result = (Map<?, ?>) response;
         assertEquals(200L, result.get("status"), "Recent ordinary MSPT maximum must not become no-data");
         assertEquals(80.0, ((Number) ((Map<?, ?>) result.get("body")).get("value")).doubleValue());
+        Object missingIdle = driver.executeAsyncScript("""
+                const done = arguments[arguments.length - 1];
+                fetch(arguments[0]).then(response => done(response.status)).catch(error => done(String(error)));
+                """, "http://localhost:" + TEST_PORT_NUMBER
+                + "/v1/datapoint?type=CPU_IMPACT_PER_PLAYER&afterMillisAgo=86400000&server=Server%201");
+        assertEquals(404L, missingIdle, "CPU impact must be unavailable without an observed idle baseline");
         Awaitility.await("sparse disk history renders '-' and recent numeric values")
                 .atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
                     List<WebElement> rows = driver.findElements(By.xpath(
@@ -217,6 +223,14 @@ class JSErrorRegressionTest {
                             assertTrue(cells.get(recent).getText().matches("8(?:\\.0+)? GB"),
                                     "The populated recent 8000 MB disk sample must render 8 GB");
                         }
+                    }
+                    List<WebElement> cpuImpactRows = driver.findElements(By.xpath(
+                            "//*[@id='performance-as-numbers']//tr[td//*[contains(@class,'col-cpu') and @data-icon='users']]"));
+                    assertEquals(1, cpuImpactRows.size(), "The CPU impact row must be present");
+                    List<WebElement> cpuCells = cpuImpactRows.getFirst().findElements(By.tagName("td"));
+                    assertEquals(7, cpuCells.size());
+                    for (int column = 1; column < cpuCells.size(); column++) {
+                        assertEquals("-", cpuCells.get(column).getText(), "No historical or recent idle baseline is available");
                     }
                 });
         assertNoUnexpectedLogs(driver, address);

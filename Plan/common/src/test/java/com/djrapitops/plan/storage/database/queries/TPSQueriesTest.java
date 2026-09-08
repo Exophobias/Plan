@@ -19,6 +19,7 @@ package com.djrapitops.plan.storage.database.queries;
 import com.djrapitops.plan.delivery.domain.DateObj;
 import com.djrapitops.plan.delivery.domain.datatransfer.GenericFilter;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95th;
+import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.CPUImpactPerPlayer;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95thWithLowTPS;
 import com.djrapitops.plan.delivery.web.resolver.request.URIQuery;
 import com.djrapitops.plan.settings.config.paths.DisplaySettings;
@@ -51,6 +52,65 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public interface TPSQueriesTest extends DatabaseTestPreparer {
+
+    @Test
+    default void averageChunksPerPlayerPreservesFractionalSamples() {
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(1000, 20, 2, 20, 1000, 40, 3, 8000)));
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(2000, 20, 2, 20, 1000, 40, 5, 8000)));
+        // Idle samples cannot contribute a ratio or cause division by zero.
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(3000, 20, 0, 10, 1000, 40, 100, 8000)));
+        forcePersistenceCheck();
+        assertEquals(2L, db().query(TPSQueries.averageChunksPerPlayer(0, 4000, List.of(serverUUID()))));
+        assertEquals(1L, db().query(TPSQueries.averageChunksPerPlayer(0, 1500, List.of(serverUUID()))));
+        assertEquals(-1L, db().query(TPSQueries.averageChunksPerPlayer(2500, 4000, List.of(serverUUID()))));
+        assertEquals(-1L, db().query(TPSQueries.averageChunksPerPlayer(0, 4000, List.of(ServerUUID.randomUUID()))));
+    }
+
+    @Test
+    default void cpuImpactRequiresAnObservedIdleBaseline() {
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(1000, 20, 2, 20, 1000, 40, 3, 8000)));
+        CPUImpactPerPlayer metric = new CPUImpactPerPlayer(dbSystem());
+        GenericFilter both = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=0&before=2500"));
+        assertTrue(metric.getValue(both).isEmpty(), "Active samples alone cannot establish idle CPU usage");
+
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(2000, 20, 0, 10, 1000, 40, 3, 8000)));
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(2200, 20, 0, -1, 1000, 40, 3, 8000)));
+        forcePersistenceCheck();
+        assertEquals(0.05, metric.getValue(both).orElseThrow(), 0.000001);
+        assertTrue(metric.getValue(new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=0&before=1500"))).isEmpty(),
+                "An idle sample outside the requested window is not a baseline");
+
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(3000, 20, 0, 0, 1000, 40, 3, 8000)));
+        execute(DataStoreQueries.storeTPS(serverUUID(), new TPS(4000, 20, 2, 20, 1000, 40, 3, 8000)));
+        GenericFilter zeroBaseline = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=2500&before=4500"));
+        assertEquals(0.1, metric.getValue(zeroBaseline).orElseThrow(), 0.000001, "Measured zero CPU remains a valid baseline");
+        assertTrue(metric.getValue(new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=1500&before=2500"))).isEmpty(),
+                "An idle baseline alone cannot establish player impact");
+    }
+
+    @Test
+    default void resolutionBucketsPreserveSlowMsptSamples() {
+        TPS fast = new TPS(1000, 20, 2, 10, 1000, 40, 20, 8000);
+        fast.setMsptAverage(5.0);
+        fast.setMsptJitterAverage(1.0);
+        TPS slow = new TPS(2000, 12, 2, 80, 1000, 40, 20, 8000);
+        slow.setMsptAverage(80.0);
+        slow.setMsptJitterAverage(3.0);
+        TPS nextBucket = new TPS(20000, 20, 2, 15, 1000, 40, 20, 8000);
+        nextBucket.setMsptAverage(12.0);
+        for (TPS sample : List.of(fast, slow, new TPS(3000, 18, 2, 20, 1000, 40, 20, 8000), nextBucket)) {
+            execute(DataStoreQueries.storeTPS(serverUUID(), sample));
+        }
+        forcePersistenceCheck();
+        List<TPS> buckets = db().query(TPSQueries.fetchTPSDataOfServerInResolution(0, 30000, 10000, serverUUID()));
+        assertEquals(2, buckets.size());
+        assertEquals(80.0, buckets.getFirst().getMsptAverage());
+        assertEquals(12.0, buckets.getFirst().getTicksPerSecond());
+        assertEquals(80.0, buckets.getFirst().getCPUUsage());
+        assertEquals(2.0, buckets.getFirst().getMsptJitterAverage(), "Jitter's average aggregation remains unchanged");
+        assertEquals(12.0, buckets.getLast().getMsptAverage());
+        assertEquals(20000, buckets.getLast().getDate());
+    }
 
     @Test
     default void generalMsptMaximumIncludesNormalTpsSamples() {

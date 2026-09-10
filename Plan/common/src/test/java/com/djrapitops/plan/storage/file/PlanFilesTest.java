@@ -24,16 +24,78 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import utilities.TestResources;
 
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author AuroraLS3
  */
 @ExtendWith(FullSystemExtension.class)
 class PlanFilesTest {
+
+    @Test
+    void parallelJarResourceStreamsReturnCompleteIndependentContent(PlanFiles files) throws Exception {
+        byte[] expected = TestResources.getJarResourceAsBytes("/assets/plan/web/error.html");
+        int workers = 12;
+        CountDownLatch ready = new CountDownLatch(workers);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(workers)) {
+            var reads = new ArrayList<Future<byte[]>>();
+            for (int worker = 0; worker < workers; worker++) {
+                reads.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Resource reads were not released");
+                    return files.getResourceFromJar("web/error.html").asBytes();
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS), "All readers must contend on the first resource load");
+            start.countDown();
+            for (Future<byte[]> read : reads) assertArrayEquals(expected, read.get(10, TimeUnit.SECONDS));
+        } finally {
+            start.countDown();
+        }
+    }
+
+    @Test
+    void jarResourceStreamsHaveIndependentPositionsAndClosure(PlanFiles files) throws Exception {
+        byte[] expected = TestResources.getJarResourceAsBytes("/assets/plan/config.yml");
+        Resource resource = files.getResourceFromJar("config.yml");
+        try (InputStream first = resource.asInputStream(); InputStream second = resource.asInputStream()) {
+            assertEquals(expected[0] & 0xff, first.read());
+            assertArrayEquals(expected, second.readAllBytes());
+            second.close();
+            assertArrayEquals(Arrays.copyOfRange(expected, 1, expected.length), first.readAllBytes());
+        }
+        assertArrayEquals(expected, resource.asBytes(), "Closing prior streams must not close a subsequent read");
+    }
+
+    @Test
+    void jarResourceReadDoesNotRewriteAnUnrelatedMaterializedFile(PlanFiles files) throws Exception {
+        Path control = files.getDataDirectory().resolve("assets/plan/web/error.html");
+        Files.createDirectories(control.getParent());
+        byte[] existing = "unrelated fixture bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Files.write(control, existing);
+        assertArrayEquals(TestResources.getJarResourceAsBytes("/assets/plan/web/error.html"),
+                files.getResourceFromJar("web/error.html").asBytes());
+        assertArrayEquals(existing, Files.readAllBytes(control));
+    }
+
+    @Test
+    void missingJarResourceRemainsAnExplicitFailureWithoutCreatingAFile(PlanFiles files) {
+        assertThrows(FileNotFoundException.class, () -> files.getResourceFromJar("missing-resource-for-test.bin").asBytes());
+        assertFalse(Files.exists(files.getDataDirectory().resolve("assets/plan/missing-resource-for-test.bin")));
+    }
 
     @Test
     @DisplayName("getFileFromPluginFolder has no Path Traversal vulnerability")

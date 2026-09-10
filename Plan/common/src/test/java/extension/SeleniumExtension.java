@@ -90,9 +90,16 @@ public class SeleniumExtension implements ParameterResolver, BeforeAllCallback, 
         chromeOptions.addArguments("--remote-allow-origins=*");
         chromeOptions.setCapability(ChromeOptions.LOGGING_PREFS, getLoggingPreferences());
 
-        // Using environment variable assumes linux
-        if (System.getenv(CIProperties.CHROME_DRIVER) != null) {
-            chromeOptions.setBinary("/usr/bin/google-chrome-stable");
+        // An explicitly configured driver runs unattended on every supported desktop OS.
+        // Keep the existing Linux CI binary default; other platforms can select their own.
+        String configuredDriver = System.getenv(CIProperties.CHROME_DRIVER);
+        if (configuredDriver != null && !configuredDriver.isBlank()) {
+            String binary = System.getenv("CHROME_BINARY");
+            if (binary != null && !binary.isBlank()) {
+                chromeOptions.setBinary(binary);
+            } else if (SystemUtils.IS_OS_LINUX) {
+                chromeOptions.setBinary("/usr/bin/google-chrome-stable");
+            }
             chromeOptions.addArguments("--headless=new");
             chromeOptions.addArguments("--dns-prefetch-disable");
         }
@@ -109,6 +116,10 @@ public class SeleniumExtension implements ParameterResolver, BeforeAllCallback, 
     }
 
     private String getChromeDriverLocation() {
+        String configured = System.getenv(CIProperties.CHROME_DRIVER);
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
         if (SystemUtils.IS_OS_WINDOWS) {
             return "C:\\chromedriver.exe";
         }

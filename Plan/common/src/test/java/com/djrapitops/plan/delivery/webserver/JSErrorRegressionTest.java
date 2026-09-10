@@ -208,6 +208,16 @@ class JSErrorRegressionTest {
                 """, "http://localhost:" + TEST_PORT_NUMBER
                 + "/v1/datapoint?type=CPU_IMPACT_PER_PLAYER&afterMillisAgo=86400000&server=Server%201");
         assertEquals(404L, missingIdle, "CPU impact must be unavailable without an observed idle baseline");
+        Object missingLowTpsAverage = driver.executeAsyncScript("""
+                const done = arguments[arguments.length - 1];
+                fetch(arguments[0]).then(async response => done({status: response.status, body: await response.text()}))
+                    .catch(error => done({error: String(error)}));
+                """, "http://localhost:" + TEST_PORT_NUMBER
+                + "/v1/datapoint?type=MSPT_AVERAGE_LOW_TPS&afterMillisAgo=86400000&server=Server%201");
+        assertTrue(missingLowTpsAverage instanceof Map<?, ?>, "Low-TPS average request must return a response");
+        Map<?, ?> missingLowTpsResult = (Map<?, ?>) missingLowTpsAverage;
+        assertEquals(404L, missingLowTpsResult.get("status"),
+                () -> "Low-TPS average must be unavailable without a qualifying sample: " + missingLowTpsResult.get("body"));
         Awaitility.await("sparse disk history renders '-' and recent numeric values")
                 .atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
                     List<WebElement> rows = driver.findElements(By.xpath(
@@ -231,6 +241,16 @@ class JSErrorRegressionTest {
                     assertEquals(7, cpuCells.size());
                     for (int column = 1; column < cpuCells.size(); column++) {
                         assertEquals("-", cpuCells.get(column).getText(), "No historical or recent idle baseline is available");
+                    }
+                    List<WebElement> lowTpsMsptRows = driver.findElements(By.xpath(
+                            "//*[@id='performance-as-numbers']//tr[td//*[contains(@class,'col-tps-low-spikes') and @data-icon='stopwatch']]"));
+                    assertEquals(2, lowTpsMsptRows.size(), "Both low-TPS average and maximum rows must be present");
+                    for (WebElement row : lowTpsMsptRows) {
+                        List<WebElement> cells = row.findElements(By.tagName("td"));
+                        assertEquals(7, cells.size());
+                        for (int column = 1; column < cells.size(); column++) {
+                            assertEquals("-", cells.get(column).getText(), "No window contains a qualifying low-TPS sample");
+                        }
                     }
                 });
         assertNoUnexpectedLogs(driver, address);

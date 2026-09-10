@@ -16,6 +16,7 @@
  */
 package utilities.dagger;
 
+import com.djrapitops.plan.PlanPlugin;
 import com.djrapitops.plan.delivery.webserver.http.JettyWebserver;
 import com.djrapitops.plan.delivery.webserver.http.WebServer;
 import com.djrapitops.plan.settings.config.ExtensionSettings;
@@ -30,12 +31,10 @@ import dagger.Provides;
 import dev.vankka.dependencydownload.ApplicationDependencyManager;
 import dev.vankka.dependencydownload.path.DependencyPathProvider;
 import utilities.TestErrorLogger;
-import utilities.TestResources;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.File;
-import java.io.FileInputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -75,12 +74,11 @@ public class TestSystemObjectProvidingModule {
 
     @Provides
     @Singleton
-    JarResource.StreamFunction provideJarStreamFunction(@Named("tempDir") Path tempDir) {
-        return resource -> {
-            File copyTo = tempDir.resolve(resource).toFile();
-            TestResources.copyResourceIntoFile(copyTo, "/" + resource);
-            return new FileInputStream(copyTo);
-        };
+    JarResource.StreamFunction provideJarStreamFunction() {
+        // Model independent JAR streams directly. Recopying a shared temp file on every read
+        // races concurrent 404 pages: readers can see a partial file or FileAlreadyExistsException.
+        // JarResource retains the normal FileNotFoundException contract for a missing stream.
+        return resource -> PlanPlugin.class.getResourceAsStream("/" + resource);
     }
 
     @Provides

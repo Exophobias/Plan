@@ -19,6 +19,7 @@ package com.djrapitops.plan.storage.database.queries;
 import com.djrapitops.plan.delivery.domain.DateObj;
 import com.djrapitops.plan.delivery.domain.datatransfer.GenericFilter;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95th;
+import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTAverageWithLowTPS;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.CPUImpactPerPlayer;
 import com.djrapitops.plan.delivery.rendering.json.datapoint.types.performance.MSPTMax95thWithLowTPS;
 import com.djrapitops.plan.delivery.web.resolver.request.URIQuery;
@@ -52,6 +53,39 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 public interface TPSQueriesTest extends DatabaseTestPreparer {
+
+    @Test
+    default void lowTpsMsptAverageDistinguishesMissingFromMeasuredZero() {
+        config().set(DisplaySettings.GRAPH_TPS_THRESHOLD_MED, 10.0);
+        MSPTAverageWithLowTPS metric = new MSPTAverageWithLowTPS(config(), dbSystem());
+        GenericFilter window = new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=0&before=5000"));
+        assertEquals(-1.0, db().query(TPSQueries.averageMSPTWhenLowTps(0, 5000, List.of(serverUUID()), 10.0)));
+        assertTrue(metric.getValue(window).isEmpty(), "An empty aggregate is unavailable");
+
+        TPS normal = new TPS(1000, 15, 2, 25, 1000, 40, 20, 8000);
+        normal.setMsptAverage(66.0);
+        TPS threshold = new TPS(2000, 10, 2, 25, 1000, 40, 20, 8000);
+        threshold.setMsptAverage(80.0);
+        TPS unknown = new TPS(3000, 5, 2, 25, 1000, 40, 20, 8000);
+        for (TPS sample : List.of(normal, threshold, unknown)) execute(DataStoreQueries.storeTPS(serverUUID(), sample));
+        forcePersistenceCheck();
+        assertTrue(metric.getValue(window).isEmpty(), "Normal/exact-threshold TPS and absent MSPT are not low-TPS measurements");
+
+        TPS zero = new TPS(4000, 5, 2, 25, 1000, 40, 20, 8000);
+        zero.setMsptAverage(0.0);
+        execute(DataStoreQueries.storeTPS(serverUUID(), zero));
+        forcePersistenceCheck();
+        assertEquals(Optional.of(0.0), metric.getValue(window), "A measured zero is available");
+
+        TPS measured = new TPS(4500, 5, 2, 25, 1000, 40, 20, 8000);
+        measured.setMsptAverage(40.0);
+        execute(DataStoreQueries.storeTPS(serverUUID(), measured));
+        forcePersistenceCheck();
+        assertEquals(Optional.of(20.0), metric.getValue(window), "Only valid low-TPS measurements contribute to the mean");
+        assertEquals(Optional.of(20.0), metric.getValue(new GenericFilter(new URIQuery("after=0&before=5000"))));
+        assertTrue(metric.getValue(new GenericFilter(new URIQuery("server=" + ServerUUID.randomUUID() + "&after=0&before=5000"))).isEmpty());
+        assertTrue(metric.getValue(new GenericFilter(new URIQuery("server=" + serverUUID() + "&after=5000&before=6000"))).isEmpty());
+    }
 
     @Test
     default void averageChunksPerPlayerPreservesFractionalSamples() {

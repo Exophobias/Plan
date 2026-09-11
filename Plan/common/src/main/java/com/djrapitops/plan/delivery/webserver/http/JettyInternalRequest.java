@@ -16,6 +16,7 @@
  */
 package com.djrapitops.plan.delivery.webserver.http;
 
+import com.djrapitops.plan.delivery.web.resolver.Response;
 import com.djrapitops.plan.delivery.web.resolver.request.URIPath;
 import com.djrapitops.plan.delivery.web.resolver.request.URIQuery;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
@@ -33,6 +34,7 @@ import org.eclipse.jetty.util.Promise;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -41,6 +43,7 @@ public class JettyInternalRequest implements InternalRequest {
     private final Request request;
     private final WebserverConfiguration webserverConfiguration;
     private final AuthenticationExtractor authenticationExtractor;
+    private CompletableFuture<byte[]> body;
 
     public JettyInternalRequest(Request request, WebserverConfiguration webserverConfiguration, AuthenticationExtractor authenticationExtractor) {
         this.request = request;
@@ -90,9 +93,49 @@ public class JettyInternalRequest implements InternalRequest {
                         (one, two) -> one + ';' + two));
     }
 
-    private CompletableFuture<byte[]> readRequestBodyAsync() {
+    /** Validate these GET-only namespaces before authentication or resolver dispatch. */
+    CompletableFuture<Optional<Response>> preflight() {
+        if (!requiresEmptyBody()) return CompletableFuture.completedFuture(Optional.empty());
+        if (!"GET".equals(getMethod())) return CompletableFuture.completedFuture(Optional.of(reject(405)));
+        String length = getHeader(HttpHeader.CONTENT_LENGTH);
+        if (getHeader(HttpHeader.TRANSFER_ENCODING) != null || request.getLength() > 0
+                || (length != null && !"0".equals(length))) {
+            return CompletableFuture.completedFuture(Optional.of(reject(413)));
+        }
+        // HTTP/2 may omit Content-Length while sending DATA. Wait for EOF with a zero-byte
+        // aggregation limit; neither a failed read nor unexpected bytes count as an empty body.
+        return readRequestBodyAsync().handle((bytes, failure) -> failure == null
+                ? Optional.empty() : Optional.of(reject(400)));
+    }
+
+    private boolean requiresEmptyBody() {
+        // Use the exact decoded path passed to URIPath/resolvers, including encoded route names.
+        // Keep the raw spelling covered as well when Jetty canonicalizes dot segments/parameters.
+        return protectedPath(request.getHttpURI().getDecodedPath())
+                || protectedPath(request.getHttpURI().getPath());
+    }
+
+    private static boolean protectedPath(String path) {
+        return path != null && (path.startsWith("/auth/forum")
+                || path.equals("/patriam-bridge/player-insights")
+                || path.startsWith("/patriam-bridge/player-insights/"));
+    }
+
+    private static Response reject(int status) {
+        return Response.builder().setStatus(status).setContent("Invalid request.")
+                .setMimeType("text/plain; charset=utf-8").setHeader("Allow", "GET")
+                .setHeader("Cache-Control", "no-store").setHeader("Pragma", "no-cache")
+                .setHeader("X-Robots-Tag", "noindex, nofollow")
+                .setHeader("X-Content-Type-Options", "nosniff")
+                .setHeader("Referrer-Policy", "no-referrer").build();
+    }
+
+    private synchronized CompletableFuture<byte[]> readRequestBodyAsync() {
+        if (body != null) return body;
         CompletableFuture<byte[]> future = new CompletableFuture<>();
-        Content.Source.asByteArrayAsync(request, Integer.MAX_VALUE, new Promise.Invocable<>() {
+        body = future;
+        boolean emptyOnly = requiresEmptyBody();
+        Content.Source.asByteArrayAsync(request, emptyOnly ? 0 : Integer.MAX_VALUE, new Promise.Invocable<>() {
             @Override
             public void succeeded(byte[] result) {
                 future.complete(result != null ? result : new byte[0]);
@@ -100,7 +143,8 @@ public class JettyInternalRequest implements InternalRequest {
 
             @Override
             public void failed(Throwable x) {
-                future.complete(new byte[0]);
+                if (emptyOnly) future.completeExceptionally(x);
+                else future.complete(new byte[0]);
             }
         });
         return future;

@@ -286,7 +286,7 @@ public class ResponseFactory {
         try {
             WebResource resource = getPublicOrJarResource(fileName);
             ResponseBuilder responseBuilder = Response.builder()
-                    .setMimeType(MimeType.IMAGE)
+                    .setMimeType(fileName.endsWith(".webp") ? "image/webp" : MimeType.IMAGE)
                     .setContent(resource)
                     .setStatus(200);
 

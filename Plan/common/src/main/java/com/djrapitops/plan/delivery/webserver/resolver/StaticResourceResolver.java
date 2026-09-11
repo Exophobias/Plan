@@ -63,7 +63,7 @@ public class StaticResourceResolver implements NoAuthResolver {
             return etag.map(tag -> responseFactory.javaScriptResponse(tag, resource))
                     .orElseGet(() -> responseFactory.javaScriptResponse(resource));
         }
-        if (resource.endsWith(".png")) {
+        if (Strings.CS.endsWithAny(resource, ".png", ".webp")) {
             return etag.map(tag -> responseFactory.imageResponse(tag, resource))
                     .orElseGet(() -> responseFactory.imageResponse(resource));
         }

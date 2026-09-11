@@ -12,7 +12,11 @@ public final class ForumUser extends User {
     private final String preferenceSubject;
 
     public ForumUser(String username, String playerName, ForumIdentity identity) {
-        super(username, playerName, identity.minecraftUUID(), "", "forum-self", ForumAuthService.SELF_PERMISSIONS);
+        this(username, playerName, identity, new ForumPermissions("forum-self", ForumAuthService.SELF_PERMISSIONS));
+    }
+
+    public ForumUser(String username, String playerName, ForumIdentity identity, ForumPermissions permissions) {
+        super(username, playerName, identity.minecraftUUID(), "", permissions.group(), permissions.permissions());
         preferenceSubject = ForumAuthService.hash(identity.issuer()) + ':' + identity.subject();
     }
 

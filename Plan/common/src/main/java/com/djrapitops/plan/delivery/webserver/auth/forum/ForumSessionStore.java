@@ -11,4 +11,6 @@ public interface ForumSessionStore {
     void remove(String cookieHash) throws IOException;
     void removeAll() throws IOException;
     default String playerName(UUID uuid) throws IOException { return uuid.toString(); }
+    /** Empty means no linked local account; ambiguous or invalid mappings must throw. */
+    default Optional<ForumPermissions> linkedPermissions(UUID uuid) throws IOException { return Optional.empty(); }
 }

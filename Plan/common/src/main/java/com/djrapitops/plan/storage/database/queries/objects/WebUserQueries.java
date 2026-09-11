@@ -21,6 +21,7 @@ import com.djrapitops.plan.delivery.domain.datatransfer.preferences.Preferences;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.delivery.webserver.auth.CookieMetadata;
 import com.djrapitops.plan.delivery.webserver.auth.IncompleteRegistration;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumPermissions;
 import com.djrapitops.plan.storage.database.queries.Query;
 import com.djrapitops.plan.storage.database.queries.QueryAllStatement;
 import com.djrapitops.plan.storage.database.sql.building.Select;
@@ -51,6 +52,41 @@ public class WebUserQueries {
     private WebUserQueries() {
         /* Static method class */
     }
+
+    /**
+     * Resolve only an explicit Minecraft UUID link, with all account and permission checks in one
+     * database statement. Do not reuse fetchUser: it reads passwords and arbitrarily limits duplicate
+     * UUID links to one account. A missing account differs from an existing account with no grants.
+     */
+    public static Query<Optional<ForumPermissions>> fetchLinkedForumPermissions(UUID linkedToUUID) {
+        Objects.requireNonNull(linkedToUUID, "linkedToUUID");
+        String sql = "SELECT s.id, g.group_name, p.permission, gtp.permission_id AS linked_permission_id,"
+                + " (SELECT COUNT(*) FROM " + SecurityTable.TABLE_NAME
+                + " linked WHERE linked.linked_to_uuid=s.linked_to_uuid) AS linked_accounts"
+                + " FROM " + SecurityTable.TABLE_NAME + " s"
+                + " LEFT JOIN " + WebGroupTable.TABLE_NAME + " g ON g.id=s.group_id"
+                + " LEFT JOIN " + WebGroupToPermissionTable.TABLE_NAME + " gtp ON gtp.group_id=s.group_id"
+                + " LEFT JOIN " + WebPermissionTable.TABLE_NAME + " p ON p.id=gtp.permission_id"
+                + " WHERE s.linked_to_uuid=? ORDER BY s.id,p.id LIMIT 4097";
+        return db -> {
+            List<ForumPermissionRow> rows = db.queryList(sql, row -> {
+                String group = row.getString("group_name");
+                String permission = row.getString("permission");
+                if (row.getLong("linked_accounts") != 1 || group == null || group.isBlank()
+                        || (row.getObject("linked_permission_id") != null && (permission == null || permission.isBlank()))) {
+                    throw new IllegalStateException("Invalid linked Plan permission mapping");
+                }
+                return new ForumPermissionRow(group, permission);
+            }, linkedToUUID);
+            if (rows.isEmpty()) return Optional.empty();
+            if (rows.size() > 4096) throw new IllegalStateException("Linked Plan permissions exceed limit");
+            List<String> permissions = rows.stream().map(ForumPermissionRow::permission)
+                    .filter(Objects::nonNull).distinct().toList();
+            return Optional.of(new ForumPermissions(rows.get(0).group(), permissions));
+        };
+    }
+
+    private record ForumPermissionRow(String group, String permission) {}
 
     public static Query<Optional<User>> fetchUser(@Untrusted String username) {
         String sql = SELECT +

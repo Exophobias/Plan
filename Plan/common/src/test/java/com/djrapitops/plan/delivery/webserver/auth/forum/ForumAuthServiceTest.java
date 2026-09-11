@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,7 +125,7 @@ class ForumAuthServiceTest {
         assertEquals(ForumAuthService.SELF_PERMISSIONS, user.getPermissions());
         assertTrue(user.getUsername().startsWith("forum:"));
         assertEquals("", user.getPasswordHash());
-        assertEquals("/player/" + PLAYER, login.playerPath());
+        assertEquals("/", login.playerPath());
         assertTrue(login.maxAge() > 0 && login.maxAge() <= 900);
         assertTrue(sessions.rows.containsKey(ForumAuthService.hash(login.cookie())));
         assertFalse(sessions.rows.containsKey(login.cookie()));
@@ -133,6 +134,111 @@ class ForumAuthServiceTest {
             assertFalse(user.toWebUser().hasPermission(forbidden), forbidden);
         }
         verify(broker, never()).check(any());
+    }
+
+    @Test
+    void verifiedUuidInheritsExactCurrentLocalPermissionsWithoutChangingForumIdentity() throws IOException {
+        ForumPermissions admin = new ForumPermissions("admin", List.of("access", "data", "page", "manage.users"));
+        sessions.permissions.put(PLAYER, admin);
+        ForumAuthService.LoginResult login = complete(service.begin());
+
+        User user = service.authenticate(login.cookie());
+
+        assertNotNull(user);
+        assertEquals(admin.permissions(), user.getPermissions());
+        assertEquals("admin", user.getPermissionGroup());
+        assertEquals(PLAYER, sessions.permissionLookupUuid);
+        assertEquals(PLAYER, user.getLinkedToUUID());
+        assertTrue(user.toWebUser().hasPermission("access.raw.player.data"));
+        assertTrue(user.toWebUser().hasPermission("access.server"));
+        assertTrue(user.toWebUser().hasPermission("manage.users"));
+        assertEquals("forum", user.toWebUser().getAuthenticationProvider().orElseThrow());
+        assertEquals(ForumAuthService.hash(ISSUER) + ":42", user.toWebUser().getAuthenticationSubject().orElseThrow());
+        assertTrue(user.getUsername().startsWith("forum:"));
+        assertEquals("", user.getPasswordHash());
+        assertFalse(user.doesPasswordMatch(""));
+        assertEquals("/", login.playerPath());
+    }
+
+    @Test
+    void matchingMutablePlayerNameCannotBorrowAnotherUuidsPlanPermissions() throws IOException {
+        sessions.playerName = "gerber11";
+        sessions.permissions.put(UUID.randomUUID(), new ForumPermissions("admin", List.of("access", "manage.users")));
+
+        User user = service.authenticate(complete(service.begin()).cookie());
+
+        assertNotNull(user);
+        assertEquals("gerber11", user.getLinkedTo());
+        assertEquals(PLAYER, sessions.permissionLookupUuid);
+        assertEquals(ForumAuthService.SELF_PERMISSIONS, user.getPermissions());
+        assertFalse(user.toWebUser().hasPermission("manage.users"));
+    }
+
+    @Test
+    void localPermissionDowngradeAndEmptyGroupApplyWithoutWaitingForBrokerRecheck() throws IOException {
+        sessions.permissions.put(PLAYER, new ForumPermissions("admin", List.of("access", "manage.users")));
+        String cookie = complete(service.begin()).cookie();
+        assertTrue(service.authenticate(cookie).toWebUser().hasPermission("manage.users"));
+
+        sessions.permissions.put(PLAYER, new ForumPermissions("restricted", List.of("access.player.self")));
+        User restricted = service.authenticate(cookie);
+        assertNotNull(restricted);
+        assertEquals(List.of("access.player.self"), restricted.getPermissions());
+        assertFalse(restricted.toWebUser().hasPermission("page.player.overview"), "self page grants must not be added to a mapped account");
+        assertFalse(restricted.toWebUser().hasPermission("manage.users"));
+
+        sessions.permissions.put(PLAYER, new ForumPermissions("no_access", List.of()));
+        User denied = service.authenticate(cookie);
+        assertNotNull(denied);
+        assertTrue(denied.getPermissions().isEmpty());
+        assertFalse(denied.toWebUser().hasPermission("access.player.self"));
+        verify(broker, never()).check(any());
+    }
+
+    @Test
+    void removingLocalUuidAssociationDropsInheritedAccessOnNextRequest() throws IOException {
+        sessions.permissions.put(PLAYER, new ForumPermissions("admin", List.of("access", "manage.users")));
+        String cookie = complete(service.begin()).cookie();
+        assertTrue(service.authenticate(cookie).toWebUser().hasPermission("manage.users"));
+
+        sessions.permissions.remove(PLAYER);
+
+        User user = service.authenticate(cookie);
+        assertNotNull(user);
+        assertEquals(ForumAuthService.SELF_PERMISSIONS, user.getPermissions());
+        assertFalse(user.toWebUser().hasPermission("manage.users"));
+        verify(broker, never()).check(any());
+    }
+
+    @Test
+    void permissionStorageFailureCannotReuseEarlierAdminGrantsOrInventSelfGrants() throws IOException {
+        sessions.permissions.put(PLAYER, new ForumPermissions("admin", List.of("access", "manage.users")));
+        String cookie = complete(service.begin()).cookie();
+        assertTrue(service.authenticate(cookie).toWebUser().hasPermission("manage.users"));
+        sessions.permissionsUnavailable = true;
+
+        assertNull(service.authenticate(cookie));
+
+        sessions.permissionsUnavailable = false;
+        sessions.permissions.put(PLAYER, new ForumPermissions("restricted", List.of("access.player.self")));
+        assertEquals(List.of("access.player.self"), service.authenticate(cookie).getPermissions());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"logout", "reload", "expiry"})
+    void authorityLookupCannotBypassFinalSessionRevocationFence(String change) throws IOException {
+        sessions.permissions.put(PLAYER, new ForumPermissions("admin", List.of("access", "manage.users")));
+        String cookie = complete(service.begin()).cookie();
+        sessions.beforePermissions = () -> {
+            switch (change) {
+                case "logout" -> assertDoesNotThrow(() -> service.logout(cookie));
+                case "reload" -> service.configure(config, broker);
+                case "expiry" -> clock.advance(900_000);
+                default -> fail("Unknown change");
+            }
+        };
+
+        assertNull(service.authenticate(cookie));
     }
 
     @Test
@@ -497,12 +603,17 @@ class ForumAuthServiceTest {
 
     private static final class MemorySessions implements ForumSessionStore {
         final Map<String, Session> rows = new ConcurrentHashMap<>();
+        final Map<UUID, ForumPermissions> permissions = new ConcurrentHashMap<>();
         boolean unavailable;
         boolean removeUnavailable;
         boolean removeAllUnavailable;
+        boolean permissionsUnavailable;
+        UUID permissionLookupUuid;
+        String playerName;
         int removeAllCalls;
         Runnable afterSave = () -> {};
         Runnable beforePlayerName = () -> {};
+        Runnable beforePermissions = () -> {};
         private void available() throws IOException { if (unavailable) throw new IOException("storage unavailable"); }
         public Optional<Session> find(String cookieHash) throws IOException { available(); return Optional.ofNullable(rows.get(cookieHash)); }
         public void save(String cookieHash, Session session) throws IOException { available(); rows.put(cookieHash, session); afterSave.run(); }
@@ -517,7 +628,14 @@ class ForumAuthServiceTest {
             if (removeAllUnavailable) throw new IOException("private storage diagnostics must not be logged");
             rows.clear();
         }
-        public String playerName(UUID uuid) throws IOException { available(); beforePlayerName.run(); return uuid.toString(); }
+        public String playerName(UUID uuid) throws IOException { available(); beforePlayerName.run(); return playerName == null ? uuid.toString() : playerName; }
+        public Optional<ForumPermissions> linkedPermissions(UUID uuid) throws IOException {
+            available();
+            if (permissionsUnavailable) throw new IOException("private permission-storage diagnostics");
+            permissionLookupUuid = uuid;
+            beforePermissions.run();
+            return Optional.ofNullable(permissions.get(uuid));
+        }
     }
 
     private static final class MutableClock extends Clock {

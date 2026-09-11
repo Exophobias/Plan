@@ -193,7 +193,7 @@ public final class ForumAuthService {
             // A slow store must not reset the age of the broker's eligibility observation.
             long checkedUntil = Math.min(expires, now + recheckMillis(active, identity));
             checked.put(cookieHash, new Checked(identity, checkedUntil, true, false, active));
-            return new LoginResult(cookie, "/player/" + identity.minecraftUUID(), (int) Math.max(1, (expires - issuedAt) / 1000));
+            return new LoginResult(cookie, "/", (int) Math.max(1, (expires - issuedAt) / 1000));
         }
     }
 
@@ -232,13 +232,18 @@ public final class ForumAuthService {
                 sessions.remove(key);
                 return null;
             }
+            if (!current.accepted()) return null;
             ForumIdentity identity = session.identity();
             String username = "forum:" + hash(identity.issuer()).substring(0, 12) + ":" + identity.subject();
             String playerName = sessions.playerName(identity.minecraftUUID());
+            // Read current local authority on every request. Broker eligibility caches never cache
+            // Plan permissions; exact UUID ownership is independent of mutable account/player names.
+            ForumPermissions permissions = sessions.linkedPermissions(identity.minecraftUUID())
+                    .orElseGet(() -> new ForumPermissions("forum-self", SELF_PERMISSIONS));
             synchronized (this) {
                 if (generation != active || revoked.getIfPresent(key) != null || !current.accepted()
                         || clock.millis() >= session.expires()) return null;
-                return new ForumUser(username, playerName, identity);
+                return new ForumUser(username, playerName, identity, permissions);
             }
         } catch (IOException | RuntimeException unavailable) {
             return null;

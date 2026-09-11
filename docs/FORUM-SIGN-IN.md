@@ -1,13 +1,21 @@
 # Forum sign-in
 
 This maintained Plan fork can sign players in through the Nameless PlanAuth module. A player confirms
-their active forum account and its verified Minecraft identity on the forum, then returns to their own
-Plan page. Forum passwords and MFA codes stay on the forum. Discord authentication is not involved.
+their active forum account and its verified Minecraft identity on the forum, then returns to the
+appropriate Plan page. Forum passwords and MFA codes stay on the forum. Discord authentication is not involved.
 
-Forum sign-in grants only `access.player.self` and the player overview, sessions, versus, servers,
-statistics and plugins tabs. It grants no raw data, other-player, server, network, player-list, query,
-management or staff permissions. Existing Plan password accounts retain their existing groups and
-remain available through **Use a Plan account**. No forum group automatically becomes a Plan staff group.
+If exactly one existing Plan account is explicitly linked to the verified Minecraft UUID, forum sign-in
+uses that account's current permission group and exact permissions. Minecraft or forum names, forum
+staff roles and in-game operator/wildcard status are not used to grant Plan access. Existing password
+accounts and passwords remain unchanged and available through **Use a Plan account**.
+
+Without a linked Plan account, forum sign-in grants only `access.player.self` and the player overview,
+sessions, versus, servers, statistics and plugins tabs. Mapped accounts with no permissions retain no
+permissions. Duplicate UUID associations, missing groups and permission-storage failures deny access.
+Current permissions are read on every authenticated request, so a group change, unlink or account
+deletion removes inherited rights on the next request. No permission snapshot is stored in a forum
+session. The normal Plan landing page sends authorized administrators to the server/network view and
+users with self access to their own UUID page.
 
 ## Install and configure
 
@@ -82,9 +90,10 @@ licences are in `Plan/react/dashboard/src/assets/patriam/`.
 
 Run Plan API/common tests (including the database aggregate), frontend build, website PHP/schema,
 protocol/MFA tests and an actual cross-application acceptance pass. The common access-control suite
-covers player HTML, JSON, sessions and datapoints; raw and staff access remain separately denied for
-forum users. Tests include replay, wrong browser/state/PKCE, cross-account access, name changes, outages,
-expiry, revocation, restart, storage failures and configuration migration/races. Passing local tests
+covers player HTML, JSON, sessions and datapoints; raw and staff access require the linked Plan account's
+corresponding grants. Tests include replay, wrong browser/state/PKCE, cross-account access, name changes,
+permission inheritance/downgrade, ambiguous UUID links, outages, expiry, revocation, restart, storage
+failures and configuration migration/races. Passing local tests
 does not establish deployed acceptance.
 
 Record source commits and staged hashes using the coordination workspace's `tools/build-all.sh Plan`.

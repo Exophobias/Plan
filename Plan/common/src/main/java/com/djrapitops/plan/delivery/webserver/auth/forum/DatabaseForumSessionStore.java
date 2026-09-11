@@ -3,6 +3,7 @@ package com.djrapitops.plan.delivery.webserver.auth.forum;
 import com.djrapitops.plan.storage.database.DBSystem;
 import com.djrapitops.plan.storage.database.sql.tables.ForumSessionTable;
 import com.djrapitops.plan.storage.database.queries.objects.UserIdentifierQueries;
+import com.djrapitops.plan.storage.database.queries.objects.WebUserQueries;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
@@ -88,6 +89,16 @@ public final class DatabaseForumSessionStore implements ForumSessionStore {
                     .orElse(key.toString()));
         } catch (RuntimeException failure) {
             throw new IOException("Forum session storage unavailable");
+        }
+    }
+
+    @Override
+    public Optional<ForumPermissions> linkedPermissions(UUID uuid) throws IOException {
+        try {
+            // Permission changes, account deletion and unlinking take effect on the next request.
+            return databases.getDatabase().query(WebUserQueries.fetchLinkedForumPermissions(uuid));
+        } catch (RuntimeException failure) {
+            throw new IOException("Linked Plan permissions unavailable");
         }
     }
 }

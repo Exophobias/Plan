@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 
 import crest from '../../assets/patriam/crest.webp';
 import landscape from '../../assets/patriam/eot-misty-valley.webp';
@@ -15,23 +15,34 @@ import ForgotPasswordModal from "../../components/modal/ForgotPasswordModal";
 import {useAuth} from "../../hooks/authenticationHook.tsx";
 import ActionButton from "../../components/input/button/ActionButton.tsx";
 
-const LoginForm = ({login}) => {
+const LoginForm = ({login, active, loggingIn, usernameRef}) => {
     const {t} = useTranslation();
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const submitting = useRef(false);
+
+    useEffect(() => {
+        if (!active) setPassword('');
+    }, [active]);
 
     const onLogin = useCallback(async event => {
         event.preventDefault();
-        if (!await login(username, password)) setPassword('');
+        if (submitting.current) return;
+        submitting.current = true;
+        try {
+            if (!await login(username, password)) setPassword('');
+        } finally {
+            submitting.current = false;
+        }
     }, [username, password, setPassword, login]);
 
     return (
-        <form className="user patriam-login-form" onSubmit={onLogin}>
+        <form className="user patriam-login-form" onSubmit={onLogin} aria-busy={loggingIn}>
             <div className="mb-3">
                 <label htmlFor="inputUser">{t('html.login.username')}</label>
                 <input autoComplete="username" className="form-control form-control-user"
-                       id="inputUser"
+                       id="inputUser" ref={usernameRef}
                        placeholder={t('html.login.username')} type="text"
                        value={username} onChange={event => setUsername(event.target.value)}/>
             </div>
@@ -41,7 +52,7 @@ const LoginForm = ({login}) => {
                        id="inputPassword" placeholder={t('html.login.password')} type="password"
                        value={password} onChange={event => setPassword(event.target.value)}/>
             </div>
-            <ActionButton className="btn-user w-100" id="login-button" onClick={onLogin}>
+            <ActionButton className="btn-user w-100" id="login-button" onClick={onLogin} disabled={loggingIn}>
                 {t('html.login.login')}
             </ActionButton>
         </form>
@@ -88,10 +99,28 @@ const LoginPage = () => {
 
     const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false);
     const [forumSignIn, setForumSignIn] = useState(false);
+    const [planAccountSelected, setPlanAccountSelected] = useState(false);
+    const [loggingIn, setLoggingIn] = useState(false);
+    const usernameRef = useRef(null);
+    const forumButtonRef = useRef(null);
+    const focusAfterSwitch = useRef(false);
+    const showPlanAccount = !forumSignIn || planAccountSelected;
 
     const [successMessage, setSuccessMessage] = useState('')
     const [failMessage, setFailMessage] = useState('');
     const [redirectTo, setRedirectTo] = useState(undefined);
+
+    const switchSignInMethod = () => {
+        focusAfterSwitch.current = true;
+        setPlanAccountSelected(selected => !selected);
+        setFailMessage('');
+    };
+
+    useEffect(() => {
+        if (!focusAfterSwitch.current) return;
+        focusAfterSwitch.current = false;
+        (showPlanAccount ? usernameRef : forumButtonRef).current?.focus({preventScroll: true});
+    }, [showPlanAccount]);
 
     const togglePasswordModal = useCallback(() => setForgotPasswordModalOpen(!forgotPasswordModalOpen),
         [setForgotPasswordModalOpen, forgotPasswordModalOpen])
@@ -160,23 +189,28 @@ const LoginPage = () => {
             return setFailMessage(t('html.register.error.noPassword'));
         }
 
-        const {data, error} = await fetchLogin(username, password);
+        setLoggingIn(true);
+        try {
+            const {data, error} = await fetchLogin(username, password);
 
-        if (error) {
-            if (error.message === 'Request failed with status code 403') {
-                // Too many logins, reload browser to show forbidden page
-                window.location.reload();
+            if (error) {
+                if (error.message === 'Request failed with status code 403') {
+                    // Too many logins, reload browser to show forbidden page
+                    window.location.reload();
+                } else {
+                    setFailMessage(t('html.login.failed') + (error.data && error.data.error ? error.data.error : error.message));
+                }
+            } else if (data && data.success) {
+                await updateLoginDetails();
+                redirectAfterLogin();
+                return true;
             } else {
-                setFailMessage(t('html.login.failed') + (error.data && error.data.error ? error.data.error : error.message));
+                setFailMessage(t('html.login.failed') + (data ? data.error : t('generic.noData')));
             }
-        } else if (data && data.success) {
-            await updateLoginDetails();
-            redirectAfterLogin();
-            return true;
-        } else {
-            setFailMessage(t('html.login.failed') + (data ? data.error : t('generic.noData')));
+            return false;
+        } finally {
+            setLoggingIn(false);
         }
-        return false;
     }
 
     useEffect(() => {
@@ -219,23 +253,27 @@ const LoginPage = () => {
                         <h2 id="patriam-sign-in-title">Welcome back.</h2>
                     {failMessage && <Alert className='alert-danger'>{failMessage}</Alert>}
                     {successMessage && <Alert className='alert-success'>{successMessage}</Alert>}
-                    {forumSignIn && <>
-                        <p className="patriam-login-intro">Sign in with the forum account linked to your Minecraft account to view your own statistics.</p>
-                        <a className="btn patriam-forum-button w-100" href={`${baseAddress}/auth/forum/start`}>
-                            Sign in with your forum account <span aria-hidden="true">↗</span>
-                        </a>
-                        <p className="patriam-login-help">Need to link your account? <a href="https://forums.patriam.cc/user/connections">Visit Connections</a></p>
-                    </>}
-                    {forumSignIn ? <details className="patriam-plan-recovery">
-                        <summary>Use a Plan account</summary>
-                        <LoginForm login={login}/>
-                        <ForgotPasswordButton onClick={togglePasswordModal}/>
-                    </details> : <>
-                        <p className="patriam-login-intro">Sign in with your Plan account.</p>
-                        <LoginForm login={login}/>
-                        <ForgotPasswordButton onClick={togglePasswordModal}/>
-                        <CreateAccountLink/>
-                    </>}
+                    <div id="patriam-login-methods" className="patriam-login-methods">
+                        {forumSignIn && <div className="patriam-login-method"
+                                             aria-hidden={showPlanAccount} inert={showPlanAccount}>
+                            <p className="patriam-login-intro">Sign in with the forum account linked to your Minecraft account to view your statistics.</p>
+                            <a ref={forumButtonRef} className="btn patriam-forum-button w-100" href={`${baseAddress}/auth/forum/start`}>
+                                Sign in with your forum account <span aria-hidden="true">↗</span>
+                            </a>
+                            <p className="patriam-login-help">Need to link your account? <a href="https://forums.patriam.cc/user/connections">Visit Connections</a></p>
+                        </div>}
+                        <div className="patriam-login-method" aria-hidden={!showPlanAccount} inert={!showPlanAccount}
+                             onFocusCapture={() => setPlanAccountSelected(true)}>
+                            <p className="patriam-login-intro">Sign in with your Plan account.</p>
+                            <LoginForm login={login} active={showPlanAccount} loggingIn={loggingIn} usernameRef={usernameRef}/>
+                            <ForgotPasswordButton onClick={togglePasswordModal}/>
+                            {!forumSignIn && <CreateAccountLink/>}
+                        </div>
+                    </div>
+                    {forumSignIn && <button type="button" className="patriam-login-switch"
+                                            aria-controls="patriam-login-methods" onClick={switchSignInMethod} disabled={loggingIn}>
+                        {showPlanAccount ? 'Use your forum account' : 'Use a Plan account'}
+                    </button>}
                     <ColorChooserButton/>
                     </section>
                 </main>

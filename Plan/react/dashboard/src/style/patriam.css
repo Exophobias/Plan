@@ -212,10 +212,19 @@ body.patriam-login-page {
 .patriam-forum-button > span { font-size: 18px; line-height: 1; }
 .patriam-login-help { font-size: 12px; line-height: 1.8; color: #c2c6ca; margin: 18px 0 30px; }
 .patriam-login-help a { color: #efbf6e; text-decoration: underline; text-underline-offset: 3px; }
-.patriam-plan-recovery { border-top: 1px solid rgb(216 160 62 / 24%); padding-top: 23px; }
-.patriam-plan-recovery summary { color: #deded9; font-size: 13px; cursor: pointer; }
-.patriam-plan-recovery summary::marker { color: #d8a03e; }
-.patriam-plan-recovery[open] summary { margin-bottom: 22px; }
+.patriam-login-methods { display: grid; }
+.patriam-login-method { grid-area: 1 / 1; min-width: 0; }
+/* Both methods size the shared space; only the active method is visible and interactive. */
+.patriam-login-method[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
+.patriam-login-switch {
+    margin-top: 18px; padding: 12px 16px;
+    border: 1px solid #58606a; border-radius: 3px; background: transparent;
+    color: #deded9; font-size: 13px; line-height: 1.6;
+}
+.patriam-login-switch:hover, .patriam-login-switch:focus-visible {
+    border-color: #efbf6e; color: #efbf6e; background: rgb(216 160 62 / 6%);
+}
+.patriam-login-switch:disabled { opacity: .6; cursor: wait; }
 .patriam-login-form label { display: block; font-size: 12px; color: #c2c6ca; margin-bottom: 8px; }
 .patriam-login-form .form-control { border-radius: 3px; min-height: 46px; font-size: 14px; padding: 12px 14px; }
 .patriam-login-form .form-control::placeholder { color: #969fa7; }

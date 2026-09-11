@@ -20,6 +20,13 @@ import com.djrapitops.plan.delivery.domain.auth.User;
 import com.djrapitops.plan.delivery.domain.auth.WebPermission;
 import com.djrapitops.plan.delivery.domain.datatransfer.preferences.Preferences;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
+import com.djrapitops.plan.delivery.web.resolver.request.Request;
+import com.djrapitops.plan.delivery.web.resolver.request.URIPath;
+import com.djrapitops.plan.delivery.web.resolver.request.URIQuery;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumIdentity;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumUser;
+import com.djrapitops.plan.delivery.webserver.resolver.json.metadata.PreferencesJSONResolver;
+import com.djrapitops.plan.delivery.webserver.resolver.json.metadata.StorePreferencesJSONResolver;
 import com.djrapitops.plan.delivery.webserver.auth.ActiveCookieExpiryCleanupTask;
 import com.djrapitops.plan.delivery.webserver.auth.ActiveCookieStore;
 import com.djrapitops.plan.delivery.webserver.auth.CookieMetadata;
@@ -27,6 +34,7 @@ import com.djrapitops.plan.processing.Processing;
 import com.djrapitops.plan.settings.config.PlanConfig;
 import com.djrapitops.plan.storage.database.DatabaseTestPreparer;
 import com.djrapitops.plan.storage.database.queries.objects.WebUserQueries;
+import com.djrapitops.plan.storage.database.sql.tables.webuser.ExternalPreferencesTable;
 import com.djrapitops.plan.storage.database.transactions.commands.RemoveEverythingTransaction;
 import com.djrapitops.plan.storage.database.transactions.commands.RemoveWebUserTransaction;
 import com.djrapitops.plan.storage.database.transactions.commands.StoreWebUserTransaction;
@@ -34,6 +42,7 @@ import com.djrapitops.plan.storage.database.transactions.patches.WebGroupDefault
 import com.djrapitops.plan.storage.database.transactions.webuser.*;
 import com.djrapitops.plan.utilities.PassEncryptUtil;
 import com.google.gson.Gson;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -42,6 +51,7 @@ import utilities.TestErrorLogger;
 import utilities.TestPluginLogger;
 
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -308,5 +318,86 @@ public interface WebUserQueriesTest extends DatabaseTestPreparer {
         db().executeTransaction(new RemoveEverythingTransaction()).get();
 
         assertTrue(db().query(WebUserQueries.fetchPreferences(user)).isEmpty());
+    }
+
+    private WebUser forumViewer(String issuer, String subject, String username) {
+        ForumIdentity identity = new ForumIdentity(issuer, subject, TestConstants.PLAYER_ONE_UUID, "revision", 100, 900, 60);
+        return new ForumUser(username, "EditableName", identity).toWebUser();
+    }
+
+    @Test
+    default void externalPreferencesPersistWithoutCreatingPasswordAccounts() throws Exception {
+        WebUser user = forumViewer("https://forums.example.test", "42", "forum:display:42");
+        Preferences expected = config().getDefaultPreferences();
+        db().executeTransaction(new StoreWebUserPreferencesTransaction(new Gson().toJson(expected), user)).get();
+        assertEquals(expected, db().query(WebUserQueries.fetchPreferences(user)).orElseThrow());
+        assertTrue(db().query(WebUserQueries.fetchAllUsers()).isEmpty());
+        assertTrue(db().query(WebUserQueries.fetchAllPreferences()).isEmpty());
+        assertEquals(1, db().query(WebUserQueries.fetchAllExternalPreferences()).size());
+    }
+
+    @Test
+    default void externalPreferencesUseImmutableIssuerAndSubjectAcrossNames() throws Exception {
+        WebUser original = forumViewer("https://forums.example.test", "42", "old-forum-login");
+        Preferences expected = config().getDefaultPreferences();
+        db().executeTransaction(new StoreWebUserPreferencesTransaction(new Gson().toJson(expected), original)).get();
+        WebUser renamed = forumViewer("https://forums.example.test", "42", "new-forum-login");
+        assertEquals(expected, db().query(WebUserQueries.fetchPreferences(renamed)).orElseThrow());
+        assertTrue(db().query(WebUserQueries.fetchPreferences(forumViewer("https://other.example.test", "42", "old-forum-login"))).isEmpty());
+        assertTrue(db().query(WebUserQueries.fetchPreferences(forumViewer("https://forums.example.test", "43", "old-forum-login"))).isEmpty());
+        WebUser otherProvider = new WebUser("EditableName", TestConstants.PLAYER_ONE_UUID, "old-forum-login", List.of(),
+                "other", original.getAuthenticationSubject().orElseThrow());
+        assertTrue(db().query(WebUserQueries.fetchPreferences(otherProvider)).isEmpty());
+    }
+
+    @Test
+    default void matchingLocalUsernameCannotReadOrChangeExternalPreferences() throws Exception {
+        userIsRegistered();
+        WebUser local = db().query(WebUserQueries.fetchUser(WEB_USERNAME)).orElseThrow().toWebUser();
+        WebUser external = forumViewer("https://forums.example.test", "42", WEB_USERNAME);
+        String localJson = "{\"firstDay\":1}";
+        String externalJson = "{\"firstDay\":6}";
+        db().executeTransaction(new StoreWebUserPreferencesTransaction(localJson, local)).get();
+        assertTrue(db().query(WebUserQueries.fetchPreferences(external)).isEmpty());
+        db().executeTransaction(new StoreWebUserPreferencesTransaction(externalJson, external)).get();
+        assertEquals(1, db().query(WebUserQueries.fetchPreferences(local)).orElseThrow().getFirstDay());
+        assertEquals(6, db().query(WebUserQueries.fetchPreferences(external)).orElseThrow().getFirstDay());
+        db().executeTransaction(new StoreWebUserPreferencesTransaction("{\"firstDay\":2}", local)).get();
+        assertEquals(6, db().query(WebUserQueries.fetchPreferences(external)).orElseThrow().getFirstDay());
+    }
+
+    @Test
+    default void externalPreferenceUpdatesReplaceOneIdentityAndClearWithDatabase() throws Exception {
+        WebUser user = forumViewer("https://forums.example.test", "42", "editable-login");
+        db().executeTransaction(new StoreWebUserPreferencesTransaction("{\"firstDay\":1}", user)).get();
+        db().executeTransaction(new StoreWebUserPreferencesTransaction("{\"firstDay\":5}", user)).get();
+        assertEquals(5, db().query(WebUserQueries.fetchPreferences(user)).orElseThrow().getFirstDay());
+        assertEquals(1, db().query(WebUserQueries.fetchAllExternalPreferences()).size());
+        db().executeTransaction(new RemoveEverythingTransaction()).get();
+        assertTrue(db().query(WebUserQueries.fetchPreferences(user)).isEmpty());
+    }
+
+    @Test
+    default void externalPreferencesMergePreservesDestinationChoices() throws Exception {
+        WebUser user = forumViewer("https://forums.example.test", "42", "editable-login");
+        db().executeTransaction(new StoreWebUserPreferencesTransaction("{\"firstDay\":5}", user)).get();
+        ExternalPreferencesTable.Row incoming = new ExternalPreferencesTable.Row(1, ExternalPreferencesTable.key(user),
+                user.getAuthenticationProvider().orElseThrow(), user.getAuthenticationSubject().orElseThrow(), "{\"firstDay\":2}");
+        db().executeInTransaction(LargeStoreQueries.insertExternalPreferences(List.of(incoming), db().getType())).get();
+        assertEquals(5, db().query(WebUserQueries.fetchPreferences(user)).orElseThrow().getFirstDay());
+    }
+
+    @Test
+    default void metadataPreferencesReadAndWriteOnlyTheAuthenticatedForumIdentity() {
+        WebUser user = forumViewer("https://forums.example.test", "42", "editable-login");
+        WebUser other = forumViewer("https://forums.example.test", "43", "another-login");
+        byte[] body = "{\"firstDay\":4,\"username\":\"another-login\",\"authenticationSubject\":\"43\"}".getBytes(StandardCharsets.UTF_8);
+        Request request = new Request("POST", new URIPath("/v1/storePreferences"), new URIQuery(""), user, Map.of(), body, "127.0.0.1");
+        new StorePreferencesJSONResolver(dbSystem()).resolve(request);
+        assertEquals(4, db().query(WebUserQueries.fetchPreferences(user)).orElseThrow().getFirstDay());
+        assertTrue(db().query(WebUserQueries.fetchPreferences(other)).isEmpty());
+        String json = new PreferencesJSONResolver(config(), dbSystem()).resolve(
+                new Request("GET", "/v1/preferences", user, Map.of(), "127.0.0.1")).orElseThrow().getAsString();
+        assertEquals(4, JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("preferences").get("firstDay").getAsInt());
     }
 }

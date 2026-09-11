@@ -1,0 +1,19 @@
+# Forum account sign-in is optional and independent of Plan's main configuration.
+# Configure the matching NamelessMC broker client before enabling this feature.
+# Unknown extension keys are preserved; invalid or ambiguous YAML is rejected unchanged.
+config-version: 1
+enabled: false
+# Canonical HTTPS forum origin, without a trailing slash.
+forum-url: 'https://forums.patriam.cc'
+client-id: 'plan'
+# Use the same secret at both ends: at least 32 random bytes, base64url encoded (43-128 characters).
+# Never publish this file or its owner-only migration backups.
+client-secret: ''
+# Must exactly match the broker's registered callback and Plan's public HTTPS address.
+callback-url: 'https://plan.patriam.cc/auth/forum/callback'
+# Sessions expire after at most 15 minutes. Eligibility rechecks fail closed on outage.
+session-seconds: 900
+# Maximum interval between eligibility checks is 60 seconds.
+recheck-seconds: 60
+# Each broker request uses this timeout (1-10 seconds).
+timeout-seconds: 5

@@ -30,6 +30,7 @@ import com.djrapitops.plan.delivery.web.resolver.exception.BadRequestException;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.delivery.webserver.CacheStrategy;
+import com.djrapitops.plan.delivery.webserver.auth.PlayerAccess;
 import com.djrapitops.plan.delivery.webserver.resolver.ETag;
 import com.djrapitops.plan.identification.Identifiers;
 import com.djrapitops.plan.utilities.dev.Untrusted;
@@ -80,7 +81,9 @@ public class SessionsJSONResolver implements Resolver {
     public boolean canAccess(Request request) {
         WebUser user = request.getUser().orElse(new WebUser(""));
         if (request.getQuery().get("player").isPresent()) {
-            return user.hasPermission(WebPermission.PAGE_PLAYER_SESSIONS);
+            return user.hasPermission(WebPermission.PAGE_PLAYER_SESSIONS)
+                    && identifiers.genericFilter(request.getQuery()).getPlayerUUID()
+                    .filter(playerUUID -> PlayerAccess.canAccess(user, playerUUID)).isPresent();
         }
         if (request.getQuery().get("server").isPresent()) {
             return user.hasPermission(WebPermission.PAGE_SERVER_SESSIONS_LIST);

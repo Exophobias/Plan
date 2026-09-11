@@ -98,6 +98,9 @@ class HttpAccessControlTest {
             "/auth/register",
             "/auth/login",
             "/auth/logout",
+            "/auth/forum/status",
+            "/auth/forum/start",
+            "/auth/forum/callback",
             "/login",
             "/register"
     })

@@ -50,7 +50,6 @@ shadowJar {
 
     exclude "org.javassist:.*"
     // Exclude swagger
-    exclude "org/yaml/**/*"
     exclude "nonapi/**/*"
     exclude "io/github/classgraph/**/*"
     exclude "io/swagger/**/*"
@@ -62,6 +61,7 @@ shadowJar {
     exclude "javassist/**/*"
 
     relocate("org.slf4j", "plan.org.slf4j")
+    relocate("org.yaml.snakeyaml", "plan.org.yaml.snakeyaml")
 
     // Unrelocate a package to use platform version of some libraries that were relocated in Plan
     exclude "com/djrapitops/plan/unrelocate/**/*"

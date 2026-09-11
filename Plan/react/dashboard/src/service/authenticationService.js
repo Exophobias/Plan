@@ -22,3 +22,8 @@ export const fetchRegisterCheck = async (code) => {
     const url = `/auth/register?code=${encodeURIComponent(code)}`;
     return doGetRequest(url);
 }
+
+export const fetchForumSignIn = async () => {
+    if (staticSite) return {data: {enabled: false}};
+    return doGetRequest('/auth/forum/status');
+}

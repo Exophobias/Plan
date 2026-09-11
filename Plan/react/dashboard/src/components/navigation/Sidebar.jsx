@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useState} from "react";
 import {FontAwesomeIcon as Fa} from "@fortawesome/react-fontawesome";
-import logo from '../../Flaticon_circle.png';
+import logo from '../../assets/patriam/crest.webp';
 import {faDoorOpen, faDownload, faPalette, faQuestionCircle} from "@fortawesome/free-solid-svg-icons";
 import {Link, NavLink, useLocation} from "react-router";
 import {useTheme} from "../../hooks/themeHook.tsx";
@@ -16,8 +16,9 @@ import PageNavigationItem from "./PageNavigationItem";
 import {useWindowWidth} from "../../hooks/interaction/windowWidthHook.jsx";
 
 const Logo = () => (
-    <Link className="sidebar-brand d-flex align-items-center justify-content-center" to="/">
-        <img alt="logo" className="w-22" src={logo}/>
+    <Link className="sidebar-brand patriam-sidebar-brand d-flex align-items-center justify-content-center" to="/" aria-label="Patriam analytics home">
+        <img alt="" width="32" height="42" src={logo}/>
+        <span>Patriam<small>Player analytics</small></span>
     </Link>
 )
 

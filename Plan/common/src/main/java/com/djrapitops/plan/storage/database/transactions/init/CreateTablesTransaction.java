@@ -49,6 +49,7 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
                 WebGroupToPermissionTable.TABLE_NAME,
                 SecurityTable.TABLE_NAME,
                 WebUserPreferencesTable.TABLE_NAME,
+                ExternalPreferencesTable.TABLE_NAME,
                 PluginVersionTable.TABLE_NAME,
                 AllowlistBounceTable.TABLE_NAME,
                 RegistrationTable.TABLE_NAME,
@@ -77,6 +78,7 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
         execute(WorldTable.createTableSQL(dbType));
         execute(WorldTimesTable.createTableSQL(dbType));
         execute(CookieTable.createTableSQL(dbType));
+        execute(ForumSessionTable.createTableSQL());
         execute(AccessLogTable.createTableSql(dbType));
         execute(WebGroupTable.createTableSQL(dbType));
         execute(WebPermissionTable.createTableSQL(dbType));
@@ -85,6 +87,7 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
         // Ensure plan_security has id column
         executeOther(new SecurityTableIdPatch());
         execute(WebUserPreferencesTable.createTableSQL(dbType));
+        execute(ExternalPreferencesTable.createTableSQL(dbType));
         execute(PluginVersionTable.createTableSQL(dbType));
         execute(AllowlistBounceTable.createTableSQL(dbType));
         execute(RegistrationTable.createTableSql(dbType));

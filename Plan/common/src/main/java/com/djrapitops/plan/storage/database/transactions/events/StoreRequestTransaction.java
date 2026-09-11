@@ -17,6 +17,7 @@
 package com.djrapitops.plan.storage.database.transactions.events;
 
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
+import com.djrapitops.plan.delivery.web.resolver.request.RequestLogSanitizer;
 import com.djrapitops.plan.delivery.webserver.http.AccessLogger;
 import com.djrapitops.plan.delivery.webserver.http.InternalRequest;
 import com.djrapitops.plan.storage.database.sql.tables.AccessLogTable;
@@ -42,7 +43,7 @@ public class StoreRequestTransaction extends ThrowawayTransaction {
         if (uri == null) {
             uri = "non-HTTP request, missing URI";
         }
-        return StringUtils.truncate(uri, 65000);
+        return StringUtils.truncate(RequestLogSanitizer.uri(uri), 65000);
     }
 
     @Override

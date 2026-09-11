@@ -81,7 +81,7 @@ public class StorePreferencesJSONResolver implements Resolver {
         try {
             Gson gson = new Gson();
             @Untrusted String syntaxSanitized = gson.toJson(gson.fromJson(preferencesBody, Preferences.class));
-            dbSystem.getDatabase().executeTransaction(new StoreWebUserPreferencesTransaction(syntaxSanitized, user));
+            dbSystem.getDatabase().executeTransaction(new StoreWebUserPreferencesTransaction(syntaxSanitized, user)).join();
         } catch (JsonSyntaxException invalidSyntax) {
             throw new BadRequestException("Request body does not match json format of preferences");
         }

@@ -156,6 +156,7 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
             copyGroupsToPermissions(webGroupLookupTable, webPermissionLookupTable);
             LookupTable<Integer> webUserIdLookupTable = copyWebUsers(webGroupLookupTable);
             copyUserPreferences(webUserIdLookupTable);
+            copyExternalPreferences();
             LookupTable<Integer> statisticsIdLookupTable = copyStatistics();
             copyStatisticValues(statisticsIdLookupTable, userIdLookupTable, serverIdLookupTable);
             // TODO plan how to copy extension data https://github.com/plan-player-analytics/Plan/wiki/Database-Schema
@@ -553,6 +554,17 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
         } else {
             toDB.executeInTransaction(uniqueConstraintSQLite).join();
         }
+    }
+
+    private void copyExternalPreferences() {
+        logCopyMessage(ExternalPreferencesTable.TABLE_NAME);
+        batching(currentId -> {
+            List<ExternalPreferencesTable.Row> rows = fromDB.query(ExternalPreferencesTable.fetchRows(currentId, ROW_LIMIT));
+            if (rows.isEmpty()) return DONE_SIGNAL;
+            toDB.executeInTransaction(LargeStoreQueries.insertExternalPreferences(rows, toDB.getType())).join();
+            logProgress(rows.size(), ExternalPreferencesTable.TABLE_NAME, false);
+            return progressTracker.isDone() ? DONE_SIGNAL : rows.get(rows.size() - 1).id();
+        });
     }
 
     private @NonNull String getIndexName(String tableName, String columns) {

@@ -18,6 +18,7 @@ package com.djrapitops.plan.storage.database.transactions.webuser;
 
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.storage.database.sql.tables.webuser.WebUserPreferencesTable;
+import com.djrapitops.plan.storage.database.sql.tables.webuser.ExternalPreferencesTable;
 import com.djrapitops.plan.storage.database.transactions.ExecStatement;
 import com.djrapitops.plan.storage.database.transactions.Transaction;
 import com.djrapitops.plan.utilities.dev.Untrusted;
@@ -44,6 +45,10 @@ public class StoreWebUserPreferencesTransaction extends Transaction {
 
     @Override
     protected void performOperations() {
+        if (user.getAuthenticationProvider().isPresent()) {
+            storeExternal();
+            return;
+        }
         execute(new ExecStatement(WebUserPreferencesTable.DELETE_BY_WEB_USERNAME) {
             @Override
             public void prepare(PreparedStatement statement) throws SQLException {
@@ -56,6 +61,26 @@ public class StoreWebUserPreferencesTransaction extends Transaction {
             public void prepare(PreparedStatement statement) throws SQLException {
                 statement.setString(1, preferences);
                 statement.setString(2, user.getUsername());
+            }
+        });
+    }
+
+    private void storeExternal() {
+        String key = ExternalPreferencesTable.key(user);
+        execute(new ExecStatement(ExternalPreferencesTable.DELETE) {
+            @Override
+            public void prepare(PreparedStatement statement) throws SQLException {
+                statement.setString(1, key);
+            }
+        });
+        // Keep delete and insert in one transaction so a failed update preserves prior preferences.
+        execute(new ExecStatement(ExternalPreferencesTable.INSERT) {
+            @Override
+            public void prepare(PreparedStatement statement) throws SQLException {
+                statement.setString(1, key);
+                statement.setString(2, user.getAuthenticationProvider().orElseThrow());
+                statement.setString(3, user.getAuthenticationSubject().orElseThrow());
+                statement.setString(4, preferences);
             }
         });
     }

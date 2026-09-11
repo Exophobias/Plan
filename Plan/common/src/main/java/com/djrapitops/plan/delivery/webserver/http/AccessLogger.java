@@ -16,6 +16,8 @@
  */
 package com.djrapitops.plan.delivery.webserver.http;
 
+import com.djrapitops.plan.delivery.web.resolver.request.RequestLogSanitizer;
+
 import com.djrapitops.plan.delivery.AccessLogBatchTask;
 import com.djrapitops.plan.delivery.web.resolver.Response;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
@@ -57,7 +59,7 @@ public class AccessLogger {
                     " (from " + internalRequest.getAccessAddress(webserverConfiguration) + ") - " +
                     responseCode;
             if (webserverConfiguration.isDevMode()) {
-                message += " Request Headers" + internalRequest.getRequestHeaders();
+                message += " Request Headers" + RequestLogSanitizer.headers(internalRequest.getRequestHeaders());
             }
 
             int codeFamily = responseCode - (responseCode % 100); // 5XX, 4XX etc
@@ -93,8 +95,8 @@ public class AccessLogger {
 
     @Untrusted
     private String getRequestURI(InternalRequest internalRequest, Request request) {
-        return request != null ? request.getPath().asString() + request.getQuery().asString()
-                : internalRequest.getRequestedURIString();
+        return RequestLogSanitizer.uri(request != null ? request.getPath().asString() + request.getQuery().asString()
+                : internalRequest.getRequestedURIString());
     }
 
     public static class LoggedRequest {

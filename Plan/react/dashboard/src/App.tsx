@@ -3,6 +3,7 @@ import './style/sb-admin-2.css'
 import './style/default-colors.css';
 import './style/style.css';
 import './style/mobile.css';
+import './style/patriam.css';
 import 'react-bootstrap-range-slider/dist/react-bootstrap-range-slider.css';
 
 import {createBrowserRouter, createRoutesFromElements, Navigate, Route, RouterProvider} from "react-router";
@@ -237,7 +238,12 @@ const router = createBrowserRouter(
 );
 
 const Wrapper = ({children}: PropsWithChildren) => {
-    const {nightModeEnabled} = useTheme();
+    const {nightModeEnabled, currentTheme, color} = useTheme();
+
+    useEffect(() => {
+        document.body.classList.toggle('patriam-default', currentTheme === 'default' && (!color || color === 'theme' || color === 'undefined'));
+        return () => document.body.classList.remove('patriam-default');
+    }, [currentTheme, color]);
 
     useEffect(() => {
         if (nightModeEnabled) {

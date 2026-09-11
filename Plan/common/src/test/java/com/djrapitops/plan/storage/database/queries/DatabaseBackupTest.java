@@ -20,6 +20,7 @@ import com.djrapitops.plan.delivery.domain.DateObj;
 import com.djrapitops.plan.delivery.domain.auth.User;
 import com.djrapitops.plan.delivery.domain.datatransfer.AllowlistBounce;
 import com.djrapitops.plan.delivery.domain.datatransfer.preferences.Preferences;
+import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.gathering.domain.*;
 import com.djrapitops.plan.identification.Server;
 import com.djrapitops.plan.identification.ServerUUID;
@@ -94,6 +95,8 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
         Preferences defaultPreferences = config().getDefaultPreferences();
         String json = new Gson().toJson(defaultPreferences);
         db.executeTransaction(new StoreWebUserPreferencesTransaction(json, user.toWebUser()));
+        WebUser external = new WebUser("renamable-player", playerUUID, "renamable-login", Collections.emptyList(), "forum", "issuer-and-subject");
+        db.executeTransaction(new StoreWebUserPreferencesTransaction(json, external));
 
         List<PluginMetadata> changeSet = List.of(
                 new PluginMetadata("Plan", "5.6 build 2121"),
@@ -248,6 +251,7 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
             expected.put(JoinAddressTable.TABLE_NAME, joinAddresses.size());
             expected.put(SecurityTable.TABLE_NAME, 1);
             expected.put(WebUserPreferencesTable.TABLE_NAME, 1);
+            expected.put(ExternalPreferencesTable.TABLE_NAME, 1);
             expected.put(StatisticTable.TABLE_NAME, 1);
             // These tables insert if two servers are different
             expected.put(AccessLogTable.TABLE_NAME, beforeBackupTo.get(AccessLogTable.TABLE_NAME) + beforeBackupFrom.get(AccessLogTable.TABLE_NAME));
@@ -317,6 +321,7 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
                 assertQueryResultIsEqual(from, to, WebUserQueries.fetchGroupNames()),
                 assertQueryResultIsEqual(from, to, WebUserQueries.fetchAvailablePermissions()),
                 assertQueryResultIsEqual(from, to, WebUserQueries.fetchAllPreferences()),
+                assertQueryResultIsEqual(from, to, WebUserQueries.fetchAllExternalPreferences()),
                 assertQueryResultIsEqual(from, to, PluginMetadataQueries.getPluginHistory()),
                 assertQueryResultIsEqual(from, to, AllowlistQueries.getBounces()),
                 assertQueryResultIsEqual(from, to, LookupTableQueries.tableCounts())

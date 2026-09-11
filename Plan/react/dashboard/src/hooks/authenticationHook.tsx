@@ -9,6 +9,8 @@ type User = {
     playerName?: string;
     playerUUID?: string;
     permissions: string[];
+    authenticationProvider?: string | null;
+    authenticationSubject?: string | null;
 }
 
 type WhoAmI =

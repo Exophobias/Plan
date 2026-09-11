@@ -1,0 +1,264 @@
+/* Patriam Studios' shared identity. Data-series and status colours remain owned by Plan. */
+@font-face {
+    font-family: 'Instrument Sans'; font-style: normal; font-weight: 400 600; font-display: swap;
+    src: url('../assets/patriam/instrument-sans-latin.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Instrument Sans'; font-style: normal; font-weight: 400 600; font-display: swap;
+    src: url('../assets/patriam/instrument-sans-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Jost'; font-style: normal; font-weight: 300 500; font-display: swap;
+    src: url('../assets/patriam/jost-latin.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Jost'; font-style: normal; font-weight: 300 500; font-display: swap;
+    src: url('../assets/patriam/jost-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+body {
+    font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Only the default presentation receives the brand palette. Other installed themes,
+   high-contrast mode and explicitly selected accent colours retain their own settings. */
+body.patriam-default {
+    --p-page: #f5f2ec;
+    --p-card: #fffcf7;
+    --p-raised: #f0ebe2;
+    --p-ink: #26313c;
+    --p-muted: #57616b;
+    --p-accent: #895b10;
+    --p-line: #d8d1c5;
+    --color-text: var(--p-ink);
+    --color-theme: var(--p-accent);
+    --color-theme-text: var(--p-accent);
+    --contrast-color-theme: #ffffff;
+    --color-layout-background: var(--p-page);
+    --color-layout-title: var(--p-ink);
+    --color-layout-divider: var(--p-line);
+    --color-sidebar-background: #0b1017;
+    --color-sidebar-text: #ece7dc;
+    --color-sidebar-divider: #34352e;
+    --color-sidebar-navigation-item-background: #0b1017;
+    --color-sidebar-navigation-item-icon: #d8a03e;
+    --color-sidebar-collapsible-section-background: #101720;
+    --color-sidebar-collapsible-section-text: #ece7dc;
+    --color-sidebar-collapsible-section-hover: #202a35;
+    --color-sidebar-collapsible-section-border: #34352e;
+    --color-cards-background: var(--p-card);
+    --color-cards-border: var(--p-line);
+    --color-cards-header-background: var(--p-card);
+    --color-cards-header-border: var(--p-line);
+    --color-tabs-background: var(--p-card);
+    --color-tabs-selected: var(--p-raised);
+    --color-tabs-border: var(--p-line);
+    --color-tables-text: var(--p-ink);
+    --color-tables-odd-row: var(--p-raised);
+    --color-tables-even-row: var(--p-card);
+    --color-tables-border: var(--p-line);
+    --color-forms-input-background: var(--p-card);
+    --color-forms-input-border: var(--p-line);
+    --color-forms-input-text: var(--p-ink);
+    --color-forms-buttons-action-button: #d8a03e;
+    --contrast-color-forms-buttons-action-button: #0b1017;
+    --color-forms-buttons-outline-button-border: var(--p-muted);
+    --color-forms-dropdown-hover: var(--p-raised);
+    --color-forms-multi-select-item-background: var(--p-raised);
+    --color-forms-checkbox-checked: var(--p-accent);
+    --color-graphs-style-grid-line: var(--p-line);
+    --color-graphs-style-border: var(--p-line);
+    --color-graphs-style-tooltip-background: var(--p-card);
+    --color-graphs-style-selector-button-background: var(--p-raised);
+    --color-graphs-style-selector-button-hover: var(--p-line);
+    --color-graphs-style-selector-button-selected: #d8a03e;
+    --contrast-color-graphs-style-selector-button-hover: var(--p-ink);
+    --contrast-color-graphs-style-selector-button-selected: #0b1017;
+    --color-graphs-style-selector-text-input-background: var(--p-card);
+    --color-graphs-style-selector-text-input-border: var(--p-line);
+    --color-calendar-border: var(--p-line);
+    --color-calendar-popover-body: var(--p-card);
+    color: var(--p-ink);
+}
+body.patriam-default.night-mode-colors {
+    color-scheme: dark;
+    --p-page: #0b1017;
+    --p-card: #101720;
+    --p-raised: #18222d;
+    --p-ink: #ece7dc;
+    --p-muted: #c2c6ca;
+    --p-accent: #efbf6e;
+    --p-line: #36414b;
+    --contrast-color-theme: #0b1017;
+}
+.patriam-default .card {
+    border: 1px solid var(--p-line);
+    border-radius: .45rem;
+    box-shadow: 0 3px 15px rgb(0 0 0 / 5%) !important;
+}
+.patriam-default .card-header { border-bottom-color: var(--p-line); }
+.patriam-default .card-header h6,
+.patriam-default h1, .patriam-default h2, .patriam-default h3 {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 500;
+}
+.patriam-default .sidebar { background-image: none; border-right: 1px solid #34352e; }
+.patriam-default .sidebar .nav-link.active,
+.patriam-default .sidebar .collapse-item.active {
+    color: #f1c77d !important;
+    background: rgb(216 160 62 / 10%);
+    box-shadow: inset 2px 0 #d8a03e;
+}
+.patriam-default .sidebar .nav-link:hover,
+.patriam-default .sidebar .collapse-item:hover { color: #f1c77d !important; }
+.patriam-default .sidebar-brand { color: #ece7dc; }
+.patriam-sidebar-brand { gap: .85rem; min-height: 100px; padding: 1.25rem .7rem; }
+.patriam-sidebar-brand img { width: 32px; height: 42px; object-fit: contain; }
+.patriam-sidebar-brand > span {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-size: 1.12rem; font-weight: 400; letter-spacing: .17em; text-transform: uppercase;
+    text-align: left;
+}
+.patriam-sidebar-brand small {
+    display: block; margin-top: .3rem;
+    font-size: .54rem; letter-spacing: .14em; font-weight: 400;
+}
+.patriam-default .topbar { border-bottom: 1px solid var(--p-line); box-shadow: none !important; }
+.patriam-default .topbar, .patriam-default footer.sticky-footer { background: var(--p-card) !important; }
+.patriam-default :focus-visible { outline: 3px solid var(--p-accent); outline-offset: 3px; }
+
+/* The public sign-in page shares the forum's dark identity in both dashboard modes. */
+body.patriam-login-page {
+    background: #0b1017;
+    color: #ece7dc;
+    color-scheme: dark;
+}
+.patriam-login-page #wrapper { background: none; display: block; }
+.patriam-login-shell {
+    width: min(1320px, 100%); min-height: 100dvh; margin: 0 auto;
+    padding: 0 clamp(22px, 4.2vw, 64px);
+    display: flex; flex-direction: column;
+}
+.patriam-login-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    min-height: 106px; border-bottom: 1px solid rgb(216 160 62 / 24%);
+}
+.patriam-wordmark { display: inline-flex; align-items: center; gap: 14px; color: #ece7dc; }
+.patriam-wordmark img { width: 30px; height: 40px; object-fit: contain; }
+.patriam-wordmark span {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-size: 12px; font-weight: 500; letter-spacing: .24em; text-transform: uppercase;
+}
+.patriam-login-header nav { display: flex; gap: 28px; align-items: center; }
+.patriam-login-header nav a {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px; letter-spacing: .17em; text-transform: uppercase; color: #c2c6ca;
+}
+.patriam-login-header a:hover, .patriam-login-header a:focus-visible { color: #efbf6e; }
+.patriam-login-layout {
+    display: grid; grid-template-columns: 1.12fr 1fr; align-items: stretch;
+    margin: auto 0; padding: 50px 0; min-height: 630px;
+}
+.patriam-login-story { position: relative; overflow: hidden; min-height: 510px; }
+.patriam-login-landscape { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% center; }
+.patriam-login-story::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgb(11 16 23 / 20%) 0%, rgb(11 16 23 / 22%) 24%, rgb(11 16 23 / 82%) 100%);
+}
+.patriam-login-story-copy { position: relative; z-index: 1; padding: clamp(30px, 3.5vw, 50px); padding-top: 44%; }
+.patriam-eyebrow {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    color: #efbf6e; font-size: 11px; font-weight: 500; letter-spacing: .23em;
+    text-transform: uppercase; margin: 0 0 18px;
+}
+.patriam-login-story h1 {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-weight: 300; font-size: clamp(40px, 4.3vw, 62px); line-height: 1.07;
+    letter-spacing: -.015em; margin: 0 0 23px; color: #f4f0e8;
+}
+.patriam-login-story-copy > p:last-child { font-size: 14px; line-height: 1.8; color: #deded9; margin: 0; }
+.patriam-landscape-caption {
+    position: absolute; z-index: 1; bottom: 18px; left: clamp(30px, 3.5vw, 50px);
+    color: #c2c6ca; font-size: 10px; letter-spacing: .08em;
+}
+.patriam-login-card {
+    padding: clamp(32px, 4.1vw, 60px); background: #101720;
+    border: 1px solid rgb(216 160 62 / 25%); border-left: none;
+    display: flex; flex-direction: column; justify-content: center;
+    --color-text: #ece7dc;
+    --color-theme: #efbf6e;
+    --color-theme-text: #efbf6e;
+    --color-forms-input-background: #0b1017;
+    --color-forms-input-border: #58606a;
+    --color-forms-input-text: #ece7dc;
+    --color-forms-buttons-action-button: #d8a03e;
+    --contrast-color-forms-buttons-action-button: #0b1017;
+}
+.patriam-login-card h2 {
+    font-family: 'Jost', 'Segoe UI', system-ui, sans-serif;
+    font-size: clamp(30px, 3vw, 42px); line-height: 1.15; font-weight: 400;
+    color: #ece7dc; margin: 0 0 22px;
+}
+.patriam-login-intro { color: #c2c6ca; font-size: 15px; line-height: 1.85; margin: 0 0 28px; }
+.patriam-forum-button {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    color: #0b1017; background: #d8a03e; border: 1px solid #d8a03e; border-radius: 3px;
+    font-size: 13px; font-weight: 600; line-height: 1.6; padding: 15px 16px;
+}
+.patriam-forum-button:hover, .patriam-forum-button:focus-visible { color: #0b1017; background: #efbf6e; border-color: #efbf6e; }
+.patriam-forum-button > span { font-size: 18px; line-height: 1; }
+.patriam-login-help { font-size: 12px; line-height: 1.8; color: #c2c6ca; margin: 18px 0 30px; }
+.patriam-login-help a { color: #efbf6e; text-decoration: underline; text-underline-offset: 3px; }
+.patriam-plan-recovery { border-top: 1px solid rgb(216 160 62 / 24%); padding-top: 23px; }
+.patriam-plan-recovery summary { color: #deded9; font-size: 13px; cursor: pointer; }
+.patriam-plan-recovery summary::marker { color: #d8a03e; }
+.patriam-plan-recovery[open] summary { margin-bottom: 22px; }
+.patriam-login-form label { display: block; font-size: 12px; color: #c2c6ca; margin-bottom: 8px; }
+.patriam-login-form .form-control { border-radius: 3px; min-height: 46px; font-size: 14px; padding: 12px 14px; }
+.patriam-login-form .form-control::placeholder { color: #969fa7; }
+.patriam-login-form .btn-action { border-radius: 3px; padding: 12px; font-size: 14px; color: #0b1017; }
+.patriam-text-button { border: 0; background: transparent; color: #efbf6e; padding: 12px 0; }
+.patriam-theme-control { margin-top: 25px; }
+.patriam-theme-control .btn { padding: 8px 0; color: #aeb6bf; font-size: 11px; }
+.patriam-theme-control span { margin-left: 5px; }
+.patriam-login-card .alert { font-size: 13px; line-height: 1.7; }
+.patriam-login-footer {
+    border-top: 1px solid rgb(216 160 62 / 24%); padding: 24px 0;
+    display: flex; justify-content: space-between; gap: 16px;
+    color: #aeb6bf; font-size: 11px; letter-spacing: .02em;
+}
+.patriam-login-page :focus-visible { outline: 3px solid #f1c77d; outline-offset: 4px; }
+.patriam-login-card:focus { outline: none; }
+.patriam-skip-link {
+    position: fixed; top: 12px; left: 12px; z-index: 2000; transform: translateY(-180%);
+    padding: 12px 20px; background: #d8a03e; color: #0b1017;
+}
+.patriam-skip-link:focus { transform: none; color: #0b1017; }
+
+@media (max-width: 767px) {
+    .patriam-sidebar-brand > span { display: none; }
+    .patriam-login-header { min-height: 90px; flex-wrap: wrap; gap: 12px; padding: 20px 0; }
+    .patriam-wordmark span { font-size: 11px; letter-spacing: .18em; }
+    .patriam-login-header nav { gap: 22px; }
+    .patriam-login-header nav a { font-size: 10px; }
+    .patriam-login-layout { grid-template-columns: 1fr; padding: 26px 0; }
+    .patriam-login-story { min-height: 270px; }
+    .patriam-login-story-copy { padding: 35px 28px 48px; }
+    .patriam-login-story h1 { font-size: 43px; margin-bottom: 14px; }
+    .patriam-login-story-copy > p:last-child { display: none; }
+    .patriam-landscape-caption { left: 28px; }
+    .patriam-login-card { border-left: 1px solid rgb(216 160 62 / 25%); border-top: none; padding: 32px 28px; }
+    .patriam-login-card h2 { font-size: 33px; }
+    .patriam-login-footer { flex-direction: column; gap: 8px; padding: 20px 0; }
+}
+@media (max-width: 375px) {
+    .patriam-login-shell { padding-inline: 16px; }
+    .patriam-login-card { padding: 28px 20px; }
+    .patriam-forum-button { font-size: 12px; gap: 8px; padding-inline: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .patriam-login-shell *, .patriam-sidebar-brand { scroll-behavior: auto; transition: none !important; }
+}

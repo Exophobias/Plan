@@ -191,7 +191,14 @@ public final class Request {
      * @return Value if it is present in the request.
      */
     public Optional<String> getHeader(String key) {
-        return Optional.ofNullable(headers.get(key));
+        String value = null;
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                if (value != null) return Optional.empty(); // Ambiguous credentials fail closed.
+                value = entry.getValue();
+            }
+        }
+        return Optional.ofNullable(value);
     }
 
     public Request omitFirstInPath() {
@@ -209,7 +216,7 @@ public final class Request {
                 ", path=" + path +
                 ", query=" + query +
                 ", user=" + user +
-                ", headers=" + headers +
+                ", headers=" + RequestLogSanitizer.headers(headers) +
                 ", body=" + (requestBody.isDone() && !requestBody.isCompletedExceptionally() ? requestBody.join().length : "async") +
                 '}';
     }

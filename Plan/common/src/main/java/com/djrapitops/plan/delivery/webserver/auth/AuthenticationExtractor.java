@@ -17,6 +17,7 @@
 package com.djrapitops.plan.delivery.webserver.auth;
 
 import com.djrapitops.plan.delivery.webserver.http.InternalRequest;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumAuthService;
 import com.djrapitops.plan.utilities.dev.Untrusted;
 
 import javax.inject.Inject;
@@ -28,10 +29,12 @@ import java.util.Optional;
 public class AuthenticationExtractor {
 
     private final ActiveCookieStore activeCookieStore;
+    private final ForumAuthService forumAuth;
 
     @Inject
-    public AuthenticationExtractor(ActiveCookieStore activeCookieStore) {
+    public AuthenticationExtractor(ActiveCookieStore activeCookieStore, ForumAuthService forumAuth) {
         this.activeCookieStore = activeCookieStore;
+        this.forumAuth = forumAuth;
     }
 
     public Optional<Authentication> extractAuthentication(InternalRequest internalRequest) {
@@ -39,8 +42,12 @@ public class AuthenticationExtractor {
     }
 
     private Optional<Authentication> getCookieAuthentication(@Untrusted List<Cookie> cookies) {
+        if (cookies.stream().filter(cookie -> "auth".equals(cookie.getName())).count() > 1) return Optional.empty();
         for (@Untrusted Cookie cookie : cookies) {
             if ("auth".equals(cookie.getName())) {
+                if (cookie.getValue().startsWith(ForumAuthService.COOKIE_PREFIX)) {
+                    return Optional.of(() -> forumAuth.authenticate(cookie.getValue()));
+                }
                 return Optional.of(new CookieAuthentication(activeCookieStore, cookie.getValue()));
             }
         }

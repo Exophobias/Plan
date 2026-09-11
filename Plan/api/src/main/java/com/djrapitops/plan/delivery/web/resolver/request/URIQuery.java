@@ -125,6 +125,10 @@ public final class URIQuery {
     public String toString() {
         Map<String, String> copyOfByKey = new HashMap<>(this.byKey);
         copyOfByKey.remove("password");
+        copyOfByKey.remove("code");
+        copyOfByKey.remove("state");
+        copyOfByKey.remove("code_verifier");
+        copyOfByKey.remove("client_secret");
         return "URIQuery{" +
                 "byKey=" + copyOfByKey +
                 '}';

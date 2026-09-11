@@ -256,6 +256,9 @@ public class WebUserQueries {
     }
 
     public static Query<Optional<Preferences>> fetchPreferences(@Untrusted WebUser user) {
+        if (user.getAuthenticationProvider().isPresent()) {
+            return db -> db.queryOptional(ExternalPreferencesTable.SELECT, WebUserQueries::extractPreferences, ExternalPreferencesTable.key(user));
+        }
         return db -> db.queryOptional(WebUserPreferencesTable.SELECT_BY_WEB_USERNAME, WebUserQueries::extractPreferences, user.getUsername());
     }
 
@@ -274,6 +277,11 @@ public class WebUserQueries {
                 INNER_JOIN + SecurityTable.TABLE_NAME + " s ON s." + SecurityTable.ID + "=p." + WebUserPreferencesTable.WEB_USER_ID;
         return db -> db.queryMap(sql, (results, to) ->
                 to.put(results.getString(SecurityTable.USERNAME), results.getString(WebUserPreferencesTable.PREFERENCES)));
+    }
+
+    public static Query<Map<String, String>> fetchAllExternalPreferences() {
+        return db -> db.queryMap("SELECT auth_key,preferences FROM " + ExternalPreferencesTable.TABLE_NAME,
+                (results, to) -> to.put(results.getString(ExternalPreferencesTable.AUTH_KEY), results.getString(ExternalPreferencesTable.PREFERENCES)));
     }
 
     public static Query<List<SecurityTable.Row>> fetchRows(int currentId, int rowLimit) {

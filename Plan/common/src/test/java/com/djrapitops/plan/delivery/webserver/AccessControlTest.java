@@ -450,6 +450,44 @@ class AccessControlTest {
         return user;
     }
 
+    @Test
+    void selfOnlyPlayerCannotReadOtherPlayersRawDataOrStaffEndpoints() throws Exception {
+        String cookie = login(address, createUserWithPermissions("self-only-player",
+                WebPermission.ACCESS_PLAYER_SELF,
+                WebPermission.PAGE_PLAYER_OVERVIEW,
+                WebPermission.PAGE_PLAYER_SESSIONS,
+                WebPermission.PAGE_PLAYER_VERSUS,
+                WebPermission.PAGE_PLAYER_SERVERS,
+                WebPermission.PAGE_PLAYER_STATISTICS,
+                WebPermission.PAGE_PLAYER_PLUGINS,
+                WebPermission.DATA_PLAYER_PLAYTIME).getUsername());
+
+        for (String resource : Arrays.asList(
+                "/player/" + TestConstants.PLAYER_ONE_UUID,
+                "/v1/player?player=" + TestConstants.PLAYER_ONE_UUID,
+                "/v1/sessions?player=" + TestConstants.PLAYER_ONE_UUID,
+                "/v1/datapoint?type=PLAYTIME&player=" + TestConstants.PLAYER_ONE_UUID)) {
+            assertEquals(200, access(resource, cookie), resource);
+        }
+        for (String resource : Arrays.asList(
+                "/player/" + TestConstants.PLAYER_TWO_UUID,
+                "/player/" + TestConstants.PLAYER_ONE_UUID + "/raw",
+                "/player/" + TestConstants.PLAYER_TWO_UUID + "/raw",
+                "/v1/player?player=" + TestConstants.PLAYER_TWO_UUID,
+                "/v1/sessions?player=" + TestConstants.PLAYER_TWO_UUID,
+                "/v1/sessions?player=not-a-uuid",
+                "/v1/datapoint?type=PLAYTIME&player=" + TestConstants.PLAYER_TWO_UUID,
+                "/v1/datapoint?type=PLAYTIME",
+                "/v1/datapoint?type=PLAYTIME&server=" + TestConstants.SERVER_UUID,
+                "/v1/extensionData?server=" + TestConstants.SERVER_UUID,
+                "/v1/sessions?server=" + TestConstants.SERVER_UUID,
+                "/v1/sessions",
+                "/server/" + TestConstants.SERVER_UUID,
+                "/network", "/players", "/v1/players", "/query", "/v1/query", "/manage", "/v1/webGroups")) {
+            assertEquals(403, access(resource, cookie), resource);
+        }
+    }
+
     private int access(String resource, String cookie) throws IOException, KeyManagementException, NoSuchAlgorithmException {
         HttpURLConnection connection = null;
         try {

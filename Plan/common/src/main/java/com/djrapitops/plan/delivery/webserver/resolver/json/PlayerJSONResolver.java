@@ -24,6 +24,7 @@ import com.djrapitops.plan.delivery.web.resolver.Response;
 import com.djrapitops.plan.delivery.web.resolver.exception.BadRequestException;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
+import com.djrapitops.plan.delivery.webserver.auth.PlayerAccess;
 import com.djrapitops.plan.identification.Identifiers;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -61,9 +62,8 @@ public class PlayerJSONResolver implements Resolver {
         if (user.hasPermission(WebPermission.ACCESS_PLAYER)) return true;
         if (user.hasPermission(WebPermission.ACCESS_PLAYER_SELF)) {
             try {
-                UUID webUserUUID = identifiers.getPlayerUUID(user.getName());
                 UUID playerUUID = identifiers.getPlayerUUID(request);
-                return playerUUID.equals(webUserUUID);
+                return PlayerAccess.canAccess(user, playerUUID);
             } catch (BadRequestException userDoesntExist) {
                 return false; // Don't give away who has played on the server to someone with level 2 access
             }
@@ -91,6 +91,10 @@ public class PlayerJSONResolver implements Resolver {
 
     private Response getResponse(Request request) {
         UUID playerUUID = identifiers.getPlayerUUID(request); // Can throw BadRequestException
+        if (request.getUser().filter(user -> !PlayerAccess.canAccess(user, playerUUID)).isPresent()) {
+            return Response.builder().setStatus(403).setMimeType(MimeType.JSON)
+                    .setJSONContent(Map.of("error", "Forbidden")).build();
+        }
 
         Predicate<WebPermission> hasPermission = request.getUser()
                 .map(user -> (Predicate<WebPermission>) user::hasPermission)

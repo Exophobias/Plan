@@ -25,19 +25,36 @@ public final class WebUser {
     private final String username;
     private final UUID playerUUID;
     private final Set<String> permissions;
+    private final String authenticationProvider;
+    private final String authenticationSubject;
 
     public WebUser(String playerName) {
-        this.playerName = playerName;
-        this.playerUUID = null;
-        this.username = playerName;
-        this.permissions = new HashSet<>();
+        this(playerName, null, playerName, Collections.emptyList());
     }
 
     public WebUser(String playerName, UUID playerUUID, String username, Collection<String> permissions) {
+        this(playerName, playerUUID, username, permissions, null, null);
+    }
+
+    /**
+     * Creates an externally authenticated viewer. The provider and immutable, provider-namespaced
+     * subject must come from the trusted authentication adapter, never request parameters or names.
+     * Existing constructors continue to represent local Plan accounts.
+     */
+    public WebUser(String playerName, UUID playerUUID, String username, Collection<String> permissions,
+                   String authenticationProvider, String authenticationSubject) {
+        if (authenticationProvider == null && authenticationSubject != null
+                || authenticationProvider != null && (authenticationSubject == null
+                || !authenticationProvider.matches("[a-z][a-z0-9_-]{0,31}")
+                || !authenticationSubject.matches("[!-~]{1,256}"))) {
+            throw new IllegalArgumentException("External authentication requires a provider and immutable subject");
+        }
         this.playerName = playerName;
         this.playerUUID = playerUUID;
         this.username = username;
         this.permissions = new HashSet<>(permissions);
+        this.authenticationProvider = authenticationProvider;
+        this.authenticationSubject = authenticationSubject;
     }
 
     /**
@@ -80,6 +97,14 @@ public final class WebUser {
 
     public Optional<UUID> getUUID() {
         return Optional.ofNullable(playerUUID);
+    }
+
+    public Optional<String> getAuthenticationProvider() {
+        return Optional.ofNullable(authenticationProvider);
+    }
+
+    public Optional<String> getAuthenticationSubject() {
+        return Optional.ofNullable(authenticationSubject);
     }
 
     public Set<String> getPermissions() {

@@ -54,9 +54,11 @@ public class RemoveEverythingTransaction extends Patch {
         clearTable(WebPermissionTable.TABLE_NAME);
         clearTable(WebGroupTable.TABLE_NAME);
         clearTable(WebUserPreferencesTable.TABLE_NAME);
+        clearTable(ExternalPreferencesTable.TABLE_NAME);
         clearTable(SecurityTable.TABLE_NAME);
         clearTable(ServerTable.TABLE_NAME);
         clearTable(CookieTable.TABLE_NAME);
+        clearTable(ForumSessionTable.TABLE_NAME);
         clearTable(StatisticValueTable.TABLE_NAME);
         clearTable(StatisticTable.TABLE_NAME);
         clearTable(ExtensionPlayerValueTable.TABLE_NAME);

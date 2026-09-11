@@ -42,6 +42,7 @@ public interface DatabaseTestAggregate extends
         TPSQueriesTest,
         UserInfoQueriesTest,
         WebUserQueriesTest,
+        ForumSessionStoreQueriesTest,
         FilterQueryTest,
         JoinAddressQueriesTest,
         ChangeUserUUIDTransactionTest,

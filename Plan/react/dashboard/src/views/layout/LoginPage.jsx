@@ -1,46 +1,19 @@
 import React, {useCallback, useEffect, useState} from 'react';
 
-import logo from '../../Flaticon_circle.png'
-import {Alert, Card, Col, Row} from "react-bootstrap";
+import crest from '../../assets/patriam/crest.webp';
+import landscape from '../../assets/patriam/eot-misty-valley.webp';
+import {Alert} from "react-bootstrap";
 import {Link, useNavigate} from "react-router";
 import {useTranslation} from "react-i18next";
 import {FontAwesomeIcon as Fa} from "@fortawesome/react-fontawesome";
 import {faPalette} from "@fortawesome/free-solid-svg-icons";
 import {useTheme} from "../../hooks/themeHook.tsx";
 import ColorSelectorModal from "../../components/modal/ColorSelectorModal";
-import drawSine from "../../util/loginSineRenderer";
-import {fetchLogin} from "../../service/authenticationService";
+import {fetchLogin, fetchForumSignIn} from "../../service/authenticationService";
+import {baseAddress} from "../../service/backendConfiguration";
 import ForgotPasswordModal from "../../components/modal/ForgotPasswordModal";
 import {useAuth} from "../../hooks/authenticationHook.tsx";
 import ActionButton from "../../components/input/button/ActionButton.tsx";
-
-const Logo = () => {
-    return (
-        <Col md={12} className='mt-5 text-center'>
-            <img alt="logo" className="w-15" src={logo}/>
-        </Col>
-    )
-};
-
-const LoginCard = ({children}) => {
-    return (
-        <Row className="justify-content-center container-fluid">
-            <Col xl={6} lg={7} md={9}>
-                <Card className='o-hidden border-0 shadow-lg my-5'>
-                    <Card.Body className='p-0'>
-                        <Row>
-                            <Col lg={12}>
-                                <div className='p-5'>
-                                    {children}
-                                </div>
-                            </Col>
-                        </Row>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
-    )
-}
 
 const LoginForm = ({login}) => {
     const {t} = useTranslation();
@@ -48,20 +21,22 @@ const LoginForm = ({login}) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
 
-    const onLogin = useCallback(event => {
+    const onLogin = useCallback(async event => {
         event.preventDefault();
-        login(username, password);
+        if (!await login(username, password)) setPassword('');
     }, [username, password, setPassword, login]);
 
     return (
-        <form className="user">
+        <form className="user patriam-login-form" onSubmit={onLogin}>
             <div className="mb-3">
+                <label htmlFor="inputUser">{t('html.login.username')}</label>
                 <input autoComplete="username" className="form-control form-control-user"
                        id="inputUser"
                        placeholder={t('html.login.username')} type="text"
                        value={username} onChange={event => setUsername(event.target.value)}/>
             </div>
             <div className="mb-3">
+                <label htmlFor="inputPassword">{t('html.login.password')}</label>
                 <input autoComplete="current-password" className="form-control form-control-user"
                        id="inputPassword" placeholder={t('html.login.password')} type="password"
                        value={password} onChange={event => setPassword(event.target.value)}/>
@@ -78,10 +53,10 @@ const ColorChooserButton = () => {
     const {toggleColorChooser} = useTheme();
 
     return (
-        <div className='text-center'>
+        <div className='patriam-theme-control'>
             <button className="btn col-theme" onClick={toggleColorChooser}
-                    title={t('html.label.themeSelect')}>
-                <Fa icon={faPalette}/>
+                    title={t('html.label.themeSelect')} aria-label={t('html.label.themeSelect')}>
+                <Fa icon={faPalette}/> <span>Appearance</span>
             </button>
         </div>
     )
@@ -91,7 +66,7 @@ const ForgotPasswordButton = ({onClick}) => {
 
     return (
         <div className='text-center'>
-            <button className='col-theme small' onClick={onClick}>{t('html.login.forgotPassword')}</button>
+            <button type="button" className='patriam-text-button small' onClick={onClick}>{t('html.login.forgotPassword')}</button>
         </div>
     )
 }
@@ -106,24 +81,13 @@ const CreateAccountLink = () => {
     )
 }
 
-const Decoration = () => {
-    useEffect(() => {
-        drawSine('decoration');
-    })
-
-    return (
-        <Row className='justify-content-center'>
-            <canvas className="col-xl-3 col-lg-3 col-md-5" id="decoration" style={{height: "100px"}}/>
-        </Row>
-    );
-}
-
 const LoginPage = () => {
     const {t} = useTranslation();
     const navigate = useNavigate();
     const {authLoaded, authRequired, loggedIn, updateLoginDetails} = useAuth();
 
     const [forgotPasswordModalOpen, setForgotPasswordModalOpen] = useState(false);
+    const [forumSignIn, setForumSignIn] = useState(false);
 
     const [successMessage, setSuccessMessage] = useState('')
     const [failMessage, setFailMessage] = useState('');
@@ -133,7 +97,8 @@ const LoginPage = () => {
         [setForgotPasswordModalOpen, forgotPasswordModalOpen])
 
     useEffect(() => {
-        document.body.classList.add("bg-theme", "plan-bg-gradient");
+        document.body.classList.add("patriam-login-page");
+        document.title = 'Patriam | Player analytics';
 
         const urlParams = new URLSearchParams(window.location.search);
         const cameFrom = urlParams.get('from');
@@ -141,11 +106,22 @@ const LoginPage = () => {
 
         const registerSuccess = urlParams.get('registerSuccess');
         if (registerSuccess) setSuccessMessage(t('html.register.success'))
+        if (urlParams.has('forumError')) {
+            setFailMessage('Forum sign-in could not be completed. Check that your forum account is active and your Minecraft account is verified, then try again.');
+        }
 
         return () => {
-            document.body.classList.remove("bg-theme", "plan-bg-gradient");
+            document.body.classList.remove("patriam-login-page");
         }
     }, [setRedirectTo, setSuccessMessage, t])
+
+    useEffect(() => {
+        let active = true;
+        fetchForumSignIn().then(({data}) => {
+            if (active) setForumSignIn(data?.enabled === true);
+        });
+        return () => { active = false; };
+    }, []);
 
     const redirectAfterLogin = () => {
         if (redirectTo && !redirectTo.startsWith('http') && !redirectTo.startsWith('file') && !redirectTo.startsWith('javascript')) {
@@ -192,15 +168,15 @@ const LoginPage = () => {
                 window.location.reload();
             } else {
                 setFailMessage(t('html.login.failed') + (error.data && error.data.error ? error.data.error : error.message));
-                setPassword('');
             }
         } else if (data && data.success) {
             await updateLoginDetails();
             redirectAfterLogin();
+            return true;
         } else {
-            setFailMessage(t('html.login.failed') + data ? data.error : t('generic.noData'));
-            setPassword('');
+            setFailMessage(t('html.login.failed') + (data ? data.error : t('generic.noData')));
         }
+        return false;
     }
 
     useEffect(() => {
@@ -215,20 +191,59 @@ const LoginPage = () => {
 
     return (
         <>
-            <style>{'#wrapper{background-image:none;}'}</style>
-            <main className="container">
-                <Logo/>
-                <LoginCard>
+            <div className="patriam-login-shell">
+                <a className="patriam-skip-link" href="#sign-in">Skip to sign in</a>
+                <header className="patriam-login-header">
+                    <a className="patriam-wordmark" href="https://patriamstudios.com/minecraft">
+                        <img src={crest} alt="" width="30" height="40"/>
+                        <span>Patriam Studios</span>
+                    </a>
+                    <nav aria-label="Community">
+                        <a href="https://patriamstudios.com/minecraft">The server</a>
+                        <a href="https://forums.patriam.cc/">Forum</a>
+                        <a href="https://forums.patriam.cc/handbook/">Handbook</a>
+                    </nav>
+                </header>
+                <main className="patriam-login-layout">
+                    <section className="patriam-login-story" aria-labelledby="patriam-analytics-title">
+                        <img className="patriam-login-landscape" src={landscape} alt="" fetchPriority="high"/>
+                        <div className="patriam-login-story-copy">
+                            <p className="patriam-eyebrow">Edge of the World</p>
+                            <h1 id="patriam-analytics-title">Your story,<br/>in numbers.</h1>
+                            <p>Explore your time in Patriam.<br/>The places, the people, the history you make.</p>
+                        </div>
+                        <span className="patriam-landscape-caption">A world shaped by its people</span>
+                    </section>
+                    <section id="sign-in" className="patriam-login-card" aria-labelledby="patriam-sign-in-title" tabIndex={-1}>
+                        <p className="patriam-eyebrow">Player analytics</p>
+                        <h2 id="patriam-sign-in-title">Welcome back.</h2>
                     {failMessage && <Alert className='alert-danger'>{failMessage}</Alert>}
                     {successMessage && <Alert className='alert-success'>{successMessage}</Alert>}
-                    <LoginForm login={login}/>
-                    <hr className="col-secondary"/>
-                    <ForgotPasswordButton onClick={togglePasswordModal}/>
-                    <CreateAccountLink/>
+                    {forumSignIn && <>
+                        <p className="patriam-login-intro">Sign in with the forum account linked to your Minecraft account to view your own statistics.</p>
+                        <a className="btn patriam-forum-button w-100" href={`${baseAddress}/auth/forum/start`}>
+                            Sign in with your forum account <span aria-hidden="true">↗</span>
+                        </a>
+                        <p className="patriam-login-help">Need to link your account? <a href="https://forums.patriam.cc/user/connections">Visit Connections</a></p>
+                    </>}
+                    {forumSignIn ? <details className="patriam-plan-recovery">
+                        <summary>Use a Plan account</summary>
+                        <LoginForm login={login}/>
+                        <ForgotPasswordButton onClick={togglePasswordModal}/>
+                    </details> : <>
+                        <p className="patriam-login-intro">Sign in with your Plan account.</p>
+                        <LoginForm login={login}/>
+                        <ForgotPasswordButton onClick={togglePasswordModal}/>
+                        <CreateAccountLink/>
+                    </>}
                     <ColorChooserButton/>
-                </LoginCard>
-                <Decoration/>
-            </main>
+                    </section>
+                </main>
+                <footer className="patriam-login-footer">
+                    <span>Patriam: Edge of the World</span>
+                    <span>Player analytics powered by Plan</span>
+                </footer>
+            </div>
             <aside>
                 <ColorSelectorModal/>
                 <ForgotPasswordModal show={forgotPasswordModalOpen} toggle={togglePasswordModal}/>

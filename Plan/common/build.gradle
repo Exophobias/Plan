@@ -79,6 +79,8 @@ dependencies {
     implementation "org.slf4j:slf4j-api:$slf4jVersion"
     implementation "com.maxmind.geoip2:geoip2:$geoIpVersion"
     api "com.google.code.gson:gson:$gsonVersion"
+    // Independently versioned forum-auth.yml requires strict physical YAML validation.
+    implementation "org.yaml:snakeyaml:2.7"
     api "org.eclipse.jetty:jetty-server:$jettyVersion"
     implementation "org.eclipse.jetty:jetty-alpn-java-server:$jettyVersion"
     implementation "org.eclipse.jetty.http2:jetty-http2-server:$jettyVersion"

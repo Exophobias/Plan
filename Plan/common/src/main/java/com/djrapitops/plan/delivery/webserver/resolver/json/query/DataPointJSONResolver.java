@@ -29,6 +29,7 @@ import com.djrapitops.plan.delivery.web.resolver.exception.BadRequestException;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.delivery.webserver.CacheStrategy;
+import com.djrapitops.plan.delivery.webserver.auth.PlayerAccess;
 import com.djrapitops.plan.delivery.webserver.resolver.ETag;
 import com.djrapitops.plan.identification.Identifiers;
 import com.djrapitops.plan.utilities.dev.Untrusted;
@@ -73,6 +74,7 @@ public class DataPointJSONResolver implements Resolver {
         DatapointType type = request.getQuery().get("type", DatapointType::find)
                 .orElseThrow(() -> new BadRequestException("type is required"));
         GenericFilter filter = identifiers.genericFilter(request.getQuery());
+        if (request.getQuery().get("player").isPresent() && filter.getPlayerUUID().isEmpty()) return false;
 
         Optional<WebPermission> permission = datapointStore.getPermission(type, filter);
         if (permission.isEmpty()) return false;
@@ -82,12 +84,7 @@ public class DataPointJSONResolver implements Resolver {
         Optional<UUID> playerUUID = filter.getPlayerUUID();
         boolean isPlayerPermission = playerUUID.isPresent();
         if (isPlayerPermission) {
-            if (user.get().hasPermission(WebPermission.ACCESS_PLAYER)) return true;
-
-            boolean isSamePlayer = user.get().getUUID()
-                    .filter(userUUID -> playerUUID.get().equals(userUUID))
-                    .isPresent();
-            return user.get().hasPermission(WebPermission.ACCESS_PLAYER_SELF) && isSamePlayer;
+            return PlayerAccess.canAccess(user.get(), playerUUID.get());
         }
 
         return true;

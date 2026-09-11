@@ -20,6 +20,7 @@ import com.djrapitops.plan.delivery.web.resolver.NoAuthResolver;
 import com.djrapitops.plan.delivery.web.resolver.Response;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.webserver.auth.ActiveCookieStore;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumAuthService;
 import com.djrapitops.plan.delivery.webserver.auth.FailReason;
 import com.djrapitops.plan.exceptions.WebUserAuthException;
 import com.djrapitops.plan.utilities.dev.Untrusted;
@@ -40,12 +41,14 @@ import java.util.Optional;
 public class LogoutResolver implements NoAuthResolver {
 
     private final ActiveCookieStore activeCookieStore;
+    private final ForumAuthService forumAuth;
 
     @Inject
     public LogoutResolver(
-            ActiveCookieStore activeCookieStore
+            ActiveCookieStore activeCookieStore, ForumAuthService forumAuth
     ) {
         this.activeCookieStore = activeCookieStore;
+        this.forumAuth = forumAuth;
     }
 
     @GET
@@ -63,11 +66,20 @@ public class LogoutResolver implements NoAuthResolver {
         @Untrusted String foundCookie = null;
         for (@Untrusted String cookie : cookies.split(";")) {
             if (cookie.isEmpty()) continue;
-            @Untrusted String[] split = cookie.split("=");
+            @Untrusted String[] split = cookie.trim().split("=", 2);
             @Untrusted String name = split[0];
             if ("auth".equals(name) && split.length > 1) {
                 foundCookie = split[1];
-                activeCookieStore.removeCookie(foundCookie);
+                if (ForumAuthService.isForumCookie(foundCookie)) {
+                    try {
+                        forumAuth.logout(foundCookie);
+                    } catch (java.io.IOException unavailable) {
+                        return Optional.of(Response.builder().setStatus(503).setMimeType("text/plain; charset=utf-8").setHeader("Cache-Control", "no-store")
+                                .setContent("Sign-out could not be completed. Please try again.").build());
+                    }
+                } else {
+                    activeCookieStore.removeCookie(foundCookie);
+                }
             }
         }
 
@@ -80,7 +92,8 @@ public class LogoutResolver implements NoAuthResolver {
     public Response getResponse() {
         return Response.builder()
                 .redirectTo("/login")
-                .setHeader("Set-Cookie", "auth=expired; Max-Age=0; SameSite=Lax; Secure; HTTPOnly;")
+                .setHeader("Set-Cookie", "auth=expired; Path=/; Max-Age=0; SameSite=Lax; Secure; HTTPOnly;")
+                .setHeader("Cache-Control", "no-store")
                 .build();
     }
 }

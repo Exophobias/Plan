@@ -1,0 +1,531 @@
+/*
+ *  This file is part of Player Analytics (Plan).
+ *
+ *  Plan is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Lesser General Public License v3 as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  Plan is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public License
+ *  along with Plan. If not, see <https://www.gnu.org/licenses/>.
+ */
+package com.djrapitops.plan.delivery.webserver.auth.forum;
+
+import com.djrapitops.plan.delivery.domain.auth.User;
+import com.djrapitops.plan.settings.forumauth.ForumAuthConfig;
+import net.playeranalytics.plugin.server.PluginLogger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+class ForumAuthServiceTest {
+    private static final String ISSUER = "https://forums.example.test";
+    private static final String CODE = "c".repeat(43);
+    private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-000000000042");
+    @TempDir
+    Path directory;
+    private final MutableClock clock = new MutableClock();
+    private final MemorySessions sessions = new MemorySessions();
+    private final PluginLogger logger = mock(PluginLogger.class);
+    private ForumAuthConfig config;
+    private ForumBroker broker;
+    private ForumAuthService service;
+
+    @BeforeEach
+    void setUp() throws IOException {
+        config = config("secret-for-test-client-".repeat(3));
+        broker = mock(ForumBroker.class);
+        when(broker.redeem(anyString(), anyString(), anyString())).thenAnswer(ignored -> identity());
+        when(broker.check(any())).thenAnswer(ignored -> identity());
+        service = new ForumAuthService(config, broker, sessions, clock);
+    }
+
+    private static ForumAuthConfig config(String secret) {
+        ForumAuthConfig config = mock(ForumAuthConfig.class);
+        when(config.isEnabled()).thenReturn(true);
+        when(config.getForumUrl()).thenReturn(ISSUER);
+        when(config.getClientId()).thenReturn("plan-test");
+        when(config.getClientSecret()).thenReturn(secret);
+        when(config.getCallbackUrl()).thenReturn("https://plan.example.test/auth/forum/callback");
+        when(config.getAuthorizeUrl()).thenReturn(URI.create(ISSUER + "/plan-auth/authorize"));
+        when(config.getSessionSeconds()).thenReturn(900);
+        when(config.getRecheckSeconds()).thenReturn(60);
+        return config;
+    }
+
+    private ForumIdentity identity() {
+        return new ForumIdentity(ISSUER, "42", PLAYER, "link-revision-1", clock.millis() / 1000, 900, 60);
+    }
+
+    private static Map<String, String> query(ForumAuthService.LoginStart start) {
+        Map<String, String> values = new HashMap<>();
+        for (String part : URI.create(start.redirect()).getRawQuery().split("&")) {
+            String[] field = part.split("=", 2);
+            values.put(field[0], URLDecoder.decode(field[1], StandardCharsets.UTF_8));
+        }
+        return values;
+    }
+
+    private ForumAuthService.LoginResult complete(ForumAuthService.LoginStart start) throws IOException {
+        return service.complete(CODE, query(start).get("state"), start.browserCookie());
+    }
+
+    @Test
+    void loginBindsPkceStateAndBrowserThenIssuesOnlyUuidSelfPermissions() throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        Map<String, String> query = query(start);
+        assertEquals("plan-test", query.get("client_id"));
+        assertEquals(config.getCallbackUrl(), query.get("redirect_uri"));
+        assertEquals("S256", query.get("code_challenge_method"));
+        assertFalse(start.redirect().contains(config.getClientSecret()));
+        assertFalse(start.redirect().contains(start.browserCookie()));
+        doAnswer(invocation -> {
+            assertEquals(CODE, invocation.getArgument(0));
+            assertEquals(query.get("code_challenge"), ForumAuthService.challenge(invocation.getArgument(1)));
+            assertEquals(query.get("state"), invocation.getArgument(2));
+            return identity();
+        }).when(broker).redeem(anyString(), anyString(), anyString());
+
+        ForumAuthService.LoginResult login = complete(start);
+        User user = service.authenticate(login.cookie());
+
+        assertNotNull(user);
+        assertEquals(PLAYER, user.getLinkedToUUID());
+        assertEquals(ForumAuthService.SELF_PERMISSIONS, user.getPermissions());
+        assertTrue(user.getUsername().startsWith("forum:"));
+        assertEquals("", user.getPasswordHash());
+        assertEquals("/player/" + PLAYER, login.playerPath());
+        assertTrue(login.maxAge() > 0 && login.maxAge() <= 900);
+        assertTrue(sessions.rows.containsKey(ForumAuthService.hash(login.cookie())));
+        assertFalse(sessions.rows.containsKey(login.cookie()));
+        for (String forbidden : new String[]{"access.player", "access.raw.player.data", "access.server",
+                "access.network", "access.query", "access.players", "page.server.plugins", "manage.users", "data"}) {
+            assertFalse(user.toWebUser().hasPermission(forbidden), forbidden);
+        }
+        verify(broker, never()).check(any());
+    }
+
+    @Test
+    void anotherBrowserCannotRedeemOrConsumeTheLegitimateTransaction() throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        assertThrows(IOException.class, () -> service.complete(CODE, query(start).get("state"), "b".repeat(43)));
+        assertThrows(IOException.class, () -> service.complete(CODE, query(start).get("state"), null));
+        verify(broker, never()).redeem(anyString(), anyString(), anyString());
+        assertNotNull(complete(start));
+    }
+
+    @Test
+    void wrongStateForgedCodeAndReplayCannotIssueSessions() throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        assertThrows(IOException.class, () -> service.complete(CODE, "s".repeat(43), start.browserCookie()));
+        assertThrows(IOException.class, () -> service.complete("malformed", query(start).get("state"), start.browserCookie()));
+        complete(start);
+        assertThrows(IOException.class, () -> complete(start));
+        verify(broker, times(1)).redeem(anyString(), anyString(), anyString());
+        assertEquals(1, sessions.rows.size());
+    }
+
+    @Test
+    void concurrentCallbacksCanRedeemTheTransactionOnlyOnce() throws Exception {
+        ForumAuthService.LoginStart start = service.begin();
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> { try { complete(start); return true; } catch (IOException denied) { return false; } });
+            var second = executor.submit(() -> { try { complete(start); return true; } catch (IOException denied) { return false; } });
+            assertNotEquals(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS));
+            assertEquals(1, sessions.rows.size());
+            verify(broker, times(1)).redeem(anyString(), anyString(), anyString());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {300_000, -1})
+    void expiredTransactionOrBackwardClockCannotRedeem(long elapsed) throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        clock.advance(elapsed);
+        assertThrows(IOException.class, () -> complete(start));
+        verify(broker, never()).redeem(anyString(), anyString(), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"issuer", "future", "old"})
+    void wrongIssuerOrInvalidAuthenticationTimeCannotIssueSession(String mutation) throws IOException {
+        ForumIdentity valid = identity();
+        ForumIdentity wrong = new ForumIdentity(mutation.equals("issuer") ? "https://other.example.test" : ISSUER,
+                valid.subject(), PLAYER, valid.revision(), valid.authTime() + (mutation.equals("future") ? 31 : mutation.equals("old") ? -31 : 0),
+                900, 60);
+        when(broker.redeem(anyString(), anyString(), anyString())).thenReturn(wrong);
+        ForumAuthService.LoginStart start = service.begin();
+        assertThrows(IOException.class, () -> complete(start));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void redemptionOutageConsumesTransactionWithoutIssuingCookie() throws IOException {
+        when(broker.redeem(anyString(), anyString(), anyString())).thenThrow(new IOException("unavailable"));
+        ForumAuthService.LoginStart start = service.begin();
+        assertThrows(IOException.class, () -> complete(start));
+        assertThrows(IOException.class, () -> complete(start));
+        assertTrue(sessions.rows.isEmpty());
+        verify(broker, times(1)).redeem(anyString(), anyString(), anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"issuer", "subject", "uuid", "revision"})
+    void accountOrLinkChangeDeniesAccessAfterBoundedRecheck(String mutation) throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumIdentity valid = identity();
+        ForumIdentity changed = new ForumIdentity(mutation.equals("issuer") ? "https://other.example.test" : ISSUER,
+                mutation.equals("subject") ? "43" : "42", mutation.equals("uuid") ? UUID.randomUUID() : PLAYER,
+                mutation.equals("revision") ? "replacement-link" : valid.revision(), valid.authTime(), 900, 60);
+        when(broker.check(any())).thenReturn(changed);
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void explicitRefusalPermanentlyRevokesSessionInsteadOfRetryingIt() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        when(broker.check(any())).thenThrow(new ForumVerificationRefusedException());
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+        doReturn(identity()).when(broker).check(any());
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+    }
+
+    @Test
+    void configurationChangeDuringRedemptionCannotIssueMixedGenerationSession() throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        when(broker.redeem(anyString(), anyString(), anyString())).thenAnswer(ignored -> {
+            service.configure(config("rotated-secret-".repeat(4)), broker);
+            return identity();
+        });
+        assertThrows(IOException.class, () -> complete(start));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void configurationChangeDuringSaveRemovesTheUnissuedCookie() throws IOException {
+        ForumAuthService.LoginStart start = service.begin();
+        sessions.afterSave = () -> service.configure(config("rotated-secret-".repeat(4)), broker);
+        assertThrows(IOException.class, () -> complete(start));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void configurationChangeDuringRecheckCannotAuthorizeTheOldGeneration() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        when(broker.check(any())).thenAnswer(ignored -> {
+            service.configure(config("rotated-secret-".repeat(4)), broker);
+            return identity();
+        });
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertNull(service.authenticate(login.cookie()));
+    }
+
+    @Test
+    void outageFailsClosedUntilBoundedRetryAndNeverExtendsSession() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumSessionStore.Session original = sessions.rows.get(ForumAuthService.hash(login.cookie()));
+        when(broker.check(any())).thenThrow(new IOException("network down"));
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertNull(service.authenticate(login.cookie()));
+        verify(broker, times(1)).check(any());
+        clock.advance(5_000);
+        doReturn(identity()).when(broker).check(any());
+        assertNotNull(service.authenticate(login.cookie()));
+        assertEquals(original.expires(), sessions.rows.get(ForumAuthService.hash(login.cookie())).expires());
+        clock.advance(900_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void restartRequiresFreshEligibilityCheckAndPreservesExpiry() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        long expiry = sessions.rows.get(ForumAuthService.hash(login.cookie())).expires();
+        ForumAuthService restarted = new ForumAuthService(config, broker, sessions, clock);
+        assertNotNull(restarted.authenticate(login.cookie()));
+        verify(broker, times(1)).check(any());
+        assertEquals(expiry, sessions.rows.get(ForumAuthService.hash(login.cookie())).expires());
+        when(broker.check(any())).thenThrow(new IOException("revoked or unavailable"));
+        assertNull(new ForumAuthService(config, broker, sessions, clock).authenticate(login.cookie()));
+    }
+
+    private void useConfigurationFile() {
+        service = new ForumAuthService(directory.toFile(), sessions, logger, clock);
+        service.configure(config, broker);
+    }
+
+    private void writeConfiguration(boolean enabled) throws IOException {
+        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 1\nenabled: " + enabled
+                + "\nforum-url: " + config.getForumUrl() + "\nclient-id: " + config.getClientId()
+                + "\nclient-secret: " + config.getClientSecret() + "\ncallback-url: " + config.getCallbackUrl() + "\n");
+    }
+
+    @Test
+    void disablingAndReenablingForumSignInDoesNotResurrectSavedSessions() throws IOException {
+        useConfigurationFile();
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumAuthService.LoginStart pending = service.begin();
+        writeConfiguration(false);
+
+        service.initialize(true);
+
+        assertFalse(service.isEnabled());
+        assertTrue(sessions.rows.isEmpty());
+        assertThrows(IOException.class, () -> complete(pending));
+        writeConfiguration(true);
+        service.initialize(true);
+        assertTrue(service.isEnabled());
+        assertNull(service.authenticate(login.cookie()));
+        assertEquals(1, sessions.removeAllCalls);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void disabledPlanAuthenticationRevokesSessionsEvenWhenForumConfigurationIsInvalid(boolean invalidFile) throws IOException {
+        useConfigurationFile();
+        ForumAuthService.LoginResult login = complete(service.begin());
+        writeConfiguration(true);
+        if (invalidFile) Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 999\n");
+        String original = Files.readString(directory.resolve("forum-auth.yml"));
+
+        service.initialize(false);
+
+        assertFalse(service.isEnabled());
+        assertTrue(sessions.rows.isEmpty());
+        assertEquals(original, Files.readString(directory.resolve("forum-auth.yml")));
+        writeConfiguration(true);
+        service.initialize(true);
+        assertTrue(service.isEnabled());
+        assertNull(service.authenticate(login.cookie()));
+        assertEquals(1, sessions.removeAllCalls);
+    }
+
+    @Test
+    void failedPauseInvalidationMustSucceedBeforeAnyLaterEnable() throws IOException {
+        useConfigurationFile();
+        ForumAuthService.LoginResult login = complete(service.begin());
+        sessions.removeAllUnavailable = true;
+        writeConfiguration(false);
+
+        service.initialize(true);
+
+        assertFalse(service.isEnabled());
+        assertFalse(sessions.rows.isEmpty());
+        assertNull(service.authenticate(login.cookie()));
+        writeConfiguration(true);
+        service.initialize(true);
+        assertFalse(service.isEnabled());
+        assertThrows(IOException.class, service::begin);
+        assertFalse(sessions.rows.isEmpty());
+        assertEquals(2, sessions.removeAllCalls);
+        verify(logger, times(2)).warn("Forum sign-in is paused: saved sessions could not be invalidated. Check session storage before enabling.");
+
+        sessions.removeAllUnavailable = false;
+        service.initialize(true);
+        assertTrue(service.isEnabled());
+        assertTrue(sessions.rows.isEmpty());
+        assertNull(service.authenticate(login.cookie()));
+        assertEquals(3, sessions.removeAllCalls);
+    }
+
+    @Test
+    void normalEnabledInitializationPreservesSavedSessionsAndOriginalExpiry() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumSessionStore.Session original = sessions.rows.get(ForumAuthService.hash(login.cookie()));
+        writeConfiguration(true);
+        service = new ForumAuthService(directory.toFile(), sessions, logger, clock);
+
+        service.initialize(true);
+
+        assertTrue(service.isEnabled());
+        assertEquals(original, sessions.rows.get(ForumAuthService.hash(login.cookie())));
+        assertEquals(0, sessions.removeAllCalls);
+        service.configure(config, broker);
+        assertNotNull(service.authenticate(login.cookie()));
+        assertEquals(original.expires(), sessions.rows.get(ForumAuthService.hash(login.cookie())).expires());
+    }
+
+    @Test
+    void invalidFileRetainsEnabledSettingsWithoutRevokingSessions() throws IOException {
+        useConfigurationFile();
+        ForumAuthService.LoginResult login = complete(service.begin());
+        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 999\n");
+
+        service.initialize(true);
+
+        assertTrue(service.isEnabled());
+        assertNotNull(service.authenticate(login.cookie()));
+        assertEquals(0, sessions.removeAllCalls);
+    }
+
+    @Test
+    void credentialRotationInvalidatesPersistedSession() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumAuthService rotated = new ForumAuthService(config("rotated-secret-".repeat(4)), broker, sessions, clock);
+        assertNull(rotated.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void logoutRevokesCookieAndStorageFailureNeverAuthenticates() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        sessions.unavailable = true;
+        assertNull(service.authenticate(login.cookie()));
+        assertThrows(IOException.class, () -> service.logout(login.cookie()));
+        sessions.unavailable = false;
+        service.logout(login.cookie());
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void logoutDuringNameLookupCannotAuthorizeTheInflightRequest() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        sessions.beforePlayerName = () -> assertDoesNotThrow(() -> service.logout(login.cookie()));
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void failedLogoutDeletionStillRevokesInflightAndReloadedRequests() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        sessions.removeUnavailable = true;
+        sessions.beforePlayerName = () -> assertThrows(IOException.class, () -> service.logout(login.cookie()));
+        assertNull(service.authenticate(login.cookie()));
+        assertFalse(sessions.rows.isEmpty());
+        sessions.beforePlayerName = () -> {};
+        sessions.removeUnavailable = false;
+        service.configure(config, broker);
+        assertNull(service.authenticate(login.cookie()));
+        service.logout(login.cookie());
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void failedRefusalDeletionDoesNotResurrectAfterSameConfigurationReload() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        sessions.removeUnavailable = true;
+        when(broker.check(any())).thenThrow(new ForumVerificationRefusedException());
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+        assertFalse(sessions.rows.isEmpty());
+        doReturn(identity()).when(broker).check(any());
+        service.configure(config, broker);
+        clock.advance(60_000);
+        assertNull(service.authenticate(login.cookie()));
+    }
+
+    @Test
+    void nonexistentLogoutCookieDoesNotAllocateARevocationMarker() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        String unknown = ForumAuthService.COOKIE_PREFIX + "u".repeat(43);
+        service.logout(unknown);
+        // A real session appearing later under that synthetic key must not inherit a marker.
+        sessions.rows.put(ForumAuthService.hash(unknown), sessions.rows.get(ForumAuthService.hash(login.cookie())));
+        assertNotNull(service.authenticate(unknown));
+    }
+
+    @Test
+    void expiredDuringStorageCannotIssueAnAlreadyExpiredCookie() throws IOException {
+        when(config.getSessionSeconds()).thenReturn(1);
+        ForumAuthService.LoginStart start = service.begin();
+        sessions.afterSave = () -> clock.advance(1500);
+        assertThrows(IOException.class, () -> complete(start));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void slowStorageUsesActualCookieLifetimeWithoutExtendingEligibilityCache() throws IOException {
+        when(config.getRecheckSeconds()).thenReturn(1);
+        sessions.afterSave = () -> clock.advance(3000);
+        ForumAuthService.LoginResult login = complete(service.begin());
+        assertEquals(897, login.maxAge());
+        assertNotNull(service.authenticate(login.cookie()));
+        verify(broker, times(1)).check(any());
+    }
+
+    @Test
+    void disabledAndMalformedCookiesCannotReachAuthentication() throws IOException {
+        for (String cookie : new String[]{null, "", "local-cookie", "forum1_short", "forum1_" + "a".repeat(44)}) {
+            assertNull(service.authenticate(cookie));
+        }
+        verify(broker, never()).check(any());
+        when(config.isEnabled()).thenReturn(false);
+        assertFalse(service.isEnabled());
+        assertThrows(IOException.class, service::begin);
+    }
+
+    private static final class MemorySessions implements ForumSessionStore {
+        final Map<String, Session> rows = new ConcurrentHashMap<>();
+        boolean unavailable;
+        boolean removeUnavailable;
+        boolean removeAllUnavailable;
+        int removeAllCalls;
+        Runnable afterSave = () -> {};
+        Runnable beforePlayerName = () -> {};
+        private void available() throws IOException { if (unavailable) throw new IOException("storage unavailable"); }
+        public Optional<Session> find(String cookieHash) throws IOException { available(); return Optional.ofNullable(rows.get(cookieHash)); }
+        public void save(String cookieHash, Session session) throws IOException { available(); rows.put(cookieHash, session); afterSave.run(); }
+        public void remove(String cookieHash) throws IOException {
+            available();
+            if (removeUnavailable) throw new IOException("deletion unavailable");
+            rows.remove(cookieHash);
+        }
+        public void removeAll() throws IOException {
+            removeAllCalls++;
+            available();
+            if (removeAllUnavailable) throw new IOException("private storage diagnostics must not be logged");
+            rows.clear();
+        }
+        public String playerName(UUID uuid) throws IOException { available(); beforePlayerName.run(); return uuid.toString(); }
+    }
+
+    private static final class MutableClock extends Clock {
+        private long now = 1_800_000_000_000L;
+        void advance(long millis) { now += millis; }
+        public ZoneId getZone() { return ZoneOffset.UTC; }
+        public Clock withZone(ZoneId zone) { return this; }
+        public Instant instant() { return Instant.ofEpochMilli(now); }
+        public long millis() { return now; }
+    }
+}

@@ -27,6 +27,7 @@ import com.djrapitops.plan.delivery.web.resolver.exception.MethodNotAllowedExcep
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.web.resolver.request.WebUser;
 import com.djrapitops.plan.delivery.webserver.auth.FailReason;
+import com.djrapitops.plan.delivery.webserver.auth.forum.ForumAuthService;
 import com.djrapitops.plan.delivery.webserver.configuration.WebserverConfiguration;
 import com.djrapitops.plan.delivery.webserver.http.WebServer;
 import com.djrapitops.plan.delivery.webserver.resolver.*;
@@ -80,6 +81,8 @@ public class ResponseResolver {
     private final LoginPageResolver loginPageResolver;
     private final RegisterPageResolver registerPageResolver;
     private final LoginResolver loginResolver;
+    private final ForumLoginResolver forumLoginResolver;
+    private final ForumAuthService forumAuthService;
     private final LogoutResolver logoutResolver;
     private final RegisterResolver registerResolver;
     private final ErrorsPageResolver errorsPageResolver;
@@ -115,6 +118,8 @@ public class ResponseResolver {
             LoginPageResolver loginPageResolver,
             RegisterPageResolver registerPageResolver,
             LoginResolver loginResolver,
+            ForumLoginResolver forumLoginResolver,
+            ForumAuthService forumAuthService,
             LogoutResolver logoutResolver,
             RegisterResolver registerResolver,
             ErrorsPageResolver errorsPageResolver,
@@ -140,6 +145,8 @@ public class ResponseResolver {
         this.loginPageResolver = loginPageResolver;
         this.registerPageResolver = registerPageResolver;
         this.loginResolver = loginResolver;
+        this.forumLoginResolver = forumLoginResolver;
+        this.forumAuthService = forumAuthService;
         this.logoutResolver = logoutResolver;
         this.registerResolver = registerResolver;
         this.errorsPageResolver = errorsPageResolver;
@@ -150,6 +157,7 @@ public class ResponseResolver {
     }
 
     public void registerPages() {
+        forumAuthService.initialize(webServer.get().isAuthRequired());
         String plugin = "Plan";
         resolverService.registerResolver(plugin, "/robots.txt", fileResolver(responseFactory::robotsResponse));
         resolverService.registerResolver(plugin, "/manifest.json", fileResolver(() -> responseFactory.jsonFileResponse("manifest.json")));
@@ -169,6 +177,9 @@ public class ResponseResolver {
             resolverService.registerResolver(plugin, "/register", registerPageResolver);
             resolverService.registerResolver(plugin, "/auth/login", loginResolver);
             resolverService.registerResolver(plugin, "/auth/logout", logoutResolver);
+            resolverService.registerResolver(plugin, "/auth/forum/status", forumLoginResolver);
+            resolverService.registerResolver(plugin, "/auth/forum/start", forumLoginResolver);
+            resolverService.registerResolver(plugin, "/auth/forum/callback", forumLoginResolver);
             if (webserverConfiguration.isRegistrationEnabled()) {
                 resolverService.registerResolver(plugin, "/auth/register", registerResolver);
             }

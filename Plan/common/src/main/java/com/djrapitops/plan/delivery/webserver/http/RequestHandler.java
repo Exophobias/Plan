@@ -16,6 +16,8 @@
  */
 package com.djrapitops.plan.delivery.webserver.http;
 
+import com.djrapitops.plan.delivery.web.resolver.request.RequestLogSanitizer;
+
 import com.djrapitops.plan.delivery.web.resolver.Response;
 import com.djrapitops.plan.delivery.web.resolver.request.Request;
 import com.djrapitops.plan.delivery.webserver.PassBruteForceGuard;
@@ -72,7 +74,7 @@ public class RequestHandler {
             blocked = true;
         } else if (!webserverConfiguration.getAllowedIpList().isAllowed(accessAddress)) {
             webserverConfiguration.getWebserverLogMessages()
-                    .warnAboutWhitelistBlock(accessAddress, internalRequest.getRequestedURIString());
+                    .warnAboutWhitelistBlock(accessAddress, RequestLogSanitizer.uri(internalRequest.getRequestedURIString()));
             response = CompletableFuture.completedFuture(responseFactory.ipWhitelist403(accessAddress));
         } else {
             request = internalRequest.toRequest(accessAddress);

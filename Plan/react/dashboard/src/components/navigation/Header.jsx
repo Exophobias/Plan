@@ -38,6 +38,9 @@ const Header = ({page, tab, hideUpdater}) => {
 
     const {getPlayerHeadImageUrl} = useMetadata();
     const headImageUrl = user ? getPlayerHeadImageUrl(user.playerName, user.playerUUID) : undefined
+    const accountDisplayName = user?.authenticationProvider === 'forum'
+        ? user.playerName?.trim() || 'Forum account'
+        : user?.username;
     return (
         <nav className="nav-header nav mt-3 align-items-center justify-content-between container-fluid">
             <div className="d-sm-flex">
@@ -70,7 +73,7 @@ const Header = ({page, tab, hideUpdater}) => {
             <Dropdown className="nav-item">
                 <Dropdown.Toggle variant='' style={{'--bs-btn-color': 'var(--color-forms-input-text)'}}>
                     {authRequired && user ? <>
-                        <span className="me-1 login-username">{user.username} </span>
+                        <span className="me-1 login-username">{accountDisplayName} </span>
                         <img alt="user img" className="rounded-circle" src={headImageUrl} style={{height: "2rem"}}/>
                     </> : <Fa icon={faCog} className="me-2"/>}
                 </Dropdown.Toggle>

@@ -44,6 +44,8 @@ public class ActiveSession {
         extraData.put(MobKillCounter.class, new MobKillCounter());
         extraData.put(DeathCounter.class, new DeathCounter());
         extraData.put(PlayerKills.class, new PlayerKills());
+        extraData.put(com.djrapitops.plan.referrals.ReferralActivity.class,
+                new com.djrapitops.plan.referrals.ReferralActivity(start));
 
         lastMovementForAfkCalculation = start;
     }
@@ -57,6 +59,7 @@ public class ActiveSession {
 
     public synchronized FinishedSession toFinishedSession(long end) {
         updateState(end);
+        if (lastMovementForAfkCalculation < 0) recordReferralActivity(end, true);
         return new FinishedSession(playerUUID, serverUUID, start, end, afkTime, extraData.copy());
     }
 
@@ -150,6 +153,11 @@ public class ActiveSession {
 
     public synchronized void setLastMovementForAfkCalculation(long lastMovementForAfkCalculation) {
         this.lastMovementForAfkCalculation = lastMovementForAfkCalculation;
+    }
+
+    public synchronized void recordReferralActivity(long end, boolean active) {
+        extraData.get(com.djrapitops.plan.referrals.ReferralActivity.class)
+                .ifPresent(activity -> activity.classified(end, active));
     }
 
     /** Withhold the current idle gap: it may later be classified as AFK retroactively. */

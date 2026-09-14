@@ -75,7 +75,10 @@ public class AFKTracker {
         if (lastMoved == IGNORES_AFK) {
             return;
         }
+        // Resolve prior idle first; /afk must not turn an old AFK gap back into active playtime.
+        performedAction(playerUUID, time);
         usedAFKCommand.add(playerUUID);
+        SessionCache.getCachedSession(playerUUID).ifPresent(session -> session.recordReferralActivity(time, true));
         storeLastMovement(playerUUID, time - getAfkThreshold());
     }
 
@@ -91,18 +94,22 @@ public class AFKTracker {
         long lastMoved = session.getLastMovementForAfkCalculation();
         // Ignore afk permission
         if (lastMoved == IGNORES_AFK) {
+            session.recordReferralActivity(time, true);
             return 0L;
         }
         session.setLastMovementForAfkCalculation(time);
 
         try {
             if (time - lastMoved < getAfkThreshold()) {
+                session.recordReferralActivity(time, true);
                 // Threshold not crossed, no action required.
                 return 0L;
             }
 
             long removeAfkCommandEffect = usedAFKCommand.contains(playerUUID) ? getAfkThreshold() : 0;
             long timeAFK = time - lastMoved - removeAfkCommandEffect;
+
+            session.recordReferralActivity(time, false);
 
             session.addAfkTime(timeAFK);
             return timeAFK;

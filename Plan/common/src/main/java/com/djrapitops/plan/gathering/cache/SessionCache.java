@@ -91,6 +91,27 @@ public class SessionCache {
         return new HashSet<>(ACTIVE_SESSIONS.values());
     }
 
+    /** Coherent active + awaiting-storage view for prospective analytics; no logout storage race. */
+    public static List<FinishedSession> referralActivitySessions(long now) {
+        synchronized (ACTIVITY_LOCK) {
+            List<FinishedSession> sessions = new ArrayList<>();
+            AWAITING_STORAGE.values().forEach(sessions::addAll);
+            ACTIVE_SESSIONS.values().forEach(session -> sessions.add(session.toFinishedSession(now)));
+            return sessions;
+        }
+    }
+
+    /** Finalizes only prospective activity at a proven server stop using Plan's AFK definition. */
+    public static List<FinishedSession> referralShutdownSessions(long now, long afkThreshold) {
+        synchronized (ACTIVITY_LOCK) {
+            for (ActiveSession session : ACTIVE_SESSIONS.values()) synchronized (session) {
+                long last = session.getLastMovementForAfkCalculation();
+                session.recordReferralActivity(now, last < 0 || now - last < afkThreshold);
+            }
+            return referralActivitySessions(now);
+        }
+    }
+
     public static void clear() {
         synchronized (ACTIVITY_LOCK) {
             Set<UUID> players = new HashSet<>(ACTIVE_SESSIONS.keySet());

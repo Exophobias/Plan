@@ -170,7 +170,7 @@ public class DBCleanTask extends TaskSystem.Task {
             List<UUID> inactivePlayers = database.query(fetchInactivePlayerUUIDs(keepActiveAfter));
             for (UUID playerUUID : inactivePlayers) {
                 queryService.playerRemoved(playerUUID);
-                database.executeTransaction(new RemovePlayerTransaction(playerUUID));
+                database.executeTransaction(new RemovePlayerTransaction(playerUUID, true));
             }
             return inactivePlayers.size();
         }

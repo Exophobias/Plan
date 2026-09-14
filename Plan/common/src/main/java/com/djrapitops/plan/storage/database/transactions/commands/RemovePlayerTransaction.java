@@ -38,9 +38,15 @@ import static com.djrapitops.plan.storage.database.sql.building.Sql.*;
 public class RemovePlayerTransaction extends ThrowawayTransaction {
 
     private final UUID playerUUID;
+    private final boolean preserveReferralCohort;
 
     public RemovePlayerTransaction(UUID playerUUID) {
+        this(playerUUID, false);
+    }
+
+    public RemovePlayerTransaction(UUID playerUUID, boolean preserveReferralCohort) {
         this.playerUUID = playerUUID;
+        this.preserveReferralCohort = preserveReferralCohort;
     }
 
     @Override
@@ -50,6 +56,7 @@ public class RemovePlayerTransaction extends ThrowawayTransaction {
 
     @Override
     protected void performOperations() {
+        if (!preserveReferralCohort) executeOther(new com.djrapitops.plan.referrals.ReferralEraseTransaction(playerUUID));
         query(PlayerFetchQueries.playerUserName(playerUUID)).ifPresent(this::deleteWebUser);
 
         deleteFromUserIdTable(GeoInfoTable.TABLE_NAME);

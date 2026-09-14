@@ -69,6 +69,7 @@ public class StoreServerPlayerTransaction extends PlayerRegisterTransaction {
         }
 
         execute(DataStoreQueries.updateJoinAddress(playerUUID, serverUUID, joinAddress));
+        executeOther(new com.djrapitops.plan.referrals.ReferralMemberTransaction(serverUUID.asUUID(), playerUUID, registerDate));
     }
 
     private String getJoinAddress() {

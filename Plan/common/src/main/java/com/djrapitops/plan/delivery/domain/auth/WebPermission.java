@@ -96,6 +96,7 @@ public enum WebPermission implements Supplier<String>, Lang {
     PAGE_SERVER_JOIN_ADDRESSES_GRAPHS_PIE("See Latest Join Addresses graph", true),
     PAGE_SERVER_JOIN_ADDRESSES_GRAPHS_TIME("See Join Addresses over time graph"),
     PAGE_SERVER_RETENTION("See Player Retention -tab"),
+    PAGE_SERVER_REFERRALS("See authenticated referral cohort analytics (explicit grant required)"),
     PAGE_SERVER_GEOLOCATIONS("See Geolocations tab"),
     PAGE_SERVER_GEOLOCATIONS_MAP("See Geolocations Map"),
     PAGE_SERVER_GEOLOCATIONS_PING_PER_COUNTRY("See Ping Per Country table"),

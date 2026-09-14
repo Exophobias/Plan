@@ -31,6 +31,14 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
 
     public static String[] tableNames() {
         return new String[]{
+                com.djrapitops.plan.referrals.ReferralTables.MEMBERS,
+                com.djrapitops.plan.referrals.ReferralTables.ACTIVITY,
+                com.djrapitops.plan.referrals.ReferralTables.COVERAGE,
+                com.djrapitops.plan.referrals.ReferralTables.FEED,
+                com.djrapitops.plan.referrals.ReferralTables.EVENTS,
+                com.djrapitops.plan.referrals.ReferralTables.DELETED,
+                com.djrapitops.plan.referrals.ReferralTables.LATEST,
+                com.djrapitops.plan.referrals.ReferralTables.STOPS,
                 ServerTable.TABLE_NAME,
                 UsersTable.TABLE_NAME,
                 UserInfoTable.TABLE_NAME,
@@ -60,6 +68,7 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
 
     @Override
     protected void performOperations() {
+        com.djrapitops.plan.referrals.ReferralTables.createStatements().forEach(this::execute);
         // DBType is required for SQL creation, as MySQL and SQLite primary key format differs.
 
         // Create statements are run in a specific order as some tables have foreign keys,

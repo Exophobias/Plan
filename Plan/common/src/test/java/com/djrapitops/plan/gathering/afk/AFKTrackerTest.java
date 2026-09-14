@@ -51,6 +51,7 @@ class AFKTrackerTest {
 
     @AfterEach
     void tearDown() {
+        com.djrapitops.plan.referrals.ReferralCapture.pause(true, System.currentTimeMillis());
         SessionCache.clear();
     }
 
@@ -104,5 +105,27 @@ class AFKTrackerTest {
         underTest.usedAfkCommand(playerUUID, 0L);
         long afkTime = underTest.loggedOut(playerUUID, afkThreshold * 2);
         assertEquals(0L, afkTime);
+    }
+
+    @Test
+    void manualAfkDoesNotRetroactivelyTurnLongIdleIntoActiveTime() {
+        com.djrapitops.plan.referrals.ReferralCapture.pause(true,0);
+        com.djrapitops.plan.referrals.ReferralCapture.pause(false,0);
+        underTest.performedAction(playerUUID,10_000);
+        ActiveSession session = SessionCache.getCachedSession(playerUUID).orElseThrow();
+        assertEquals(10_000,session.confirmedActiveTime(120_000));
+        underTest.usedAfkCommand(playerUUID,120_000);
+        underTest.loggedOut(playerUUID,180_000);
+        assertEquals(10_000,session.toFinishedSession(180_000).getActiveTime());
+        assertEquals(java.util.List.of(new com.djrapitops.plan.referrals.ReferralActivity.Interval(0,10_000)),
+                session.getExtraData(com.djrapitops.plan.referrals.ReferralActivity.class).orElseThrow().snapshot().intervals());
+    }
+
+    @Test
+    void manualAfkPreservesOrdinaryActivePrefixAndFreezesAfterCommand() {
+        underTest.performedAction(playerUUID,10_000);
+        underTest.usedAfkCommand(playerUUID,20_000);
+        underTest.loggedOut(playerUUID,120_000);
+        assertEquals(20_000,SessionCache.getCachedSession(playerUUID).orElseThrow().toFinishedSession(120_000).getActiveTime());
     }
 }

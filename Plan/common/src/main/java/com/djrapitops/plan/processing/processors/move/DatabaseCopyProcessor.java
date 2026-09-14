@@ -21,6 +21,7 @@ import com.djrapitops.plan.gathering.domain.BaseUser;
 import com.djrapitops.plan.identification.Server;
 import com.djrapitops.plan.identification.ServerUUID;
 import com.djrapitops.plan.processing.CriticalRunnable;
+import com.djrapitops.plan.referrals.ReferralTransfer;
 import com.djrapitops.plan.settings.locale.Locale;
 import com.djrapitops.plan.settings.locale.lang.CommandLang;
 import com.djrapitops.plan.storage.database.DBType;
@@ -121,6 +122,16 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
         feedback.accept(locale.getString(CommandLang.DB_COPY_LIST_TITLE_SOURCE));
         tableCounts.forEach((key, value) -> feedback.accept(locale.getString(CommandLang.DB_COPY_LIST_ROW, key, value)));
 
+        final ReferralTransfer.Snapshot referrals;
+        try {
+            referrals = ReferralTransfer.capture(fromDB);
+            ReferralTransfer.preflight(toDB, referrals, strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
+                    strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
+        } catch (RuntimeException refusal) {
+            feedback.accept("Referral analytics transfer refused before destination changes. Use a full replacement or native database backup.");
+            return;
+        }
+
         if (strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE)) {
             feedback.accept(locale.getString(CommandLang.DB_COPY_CLEAR_START));
             toDB.executeTransaction(new RemoveEverythingTransaction()).join();
@@ -159,6 +170,7 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
             copyExternalPreferences();
             LookupTable<Integer> statisticsIdLookupTable = copyStatistics();
             copyStatisticValues(statisticsIdLookupTable, userIdLookupTable, serverIdLookupTable);
+            ReferralTransfer.restore(toDB, referrals);
             // TODO plan how to copy extension data https://github.com/plan-player-analytics/Plan/wiki/Database-Schema
 
             feedback.accept(locale.getString(CommandLang.PROGRESS_SUCCESS));

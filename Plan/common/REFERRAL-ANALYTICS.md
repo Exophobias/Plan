@@ -47,6 +47,18 @@ expiring raw user/session tables, so routine inactive-player cleanup preserves c
 Explicit player removal erases their analytics history and keeps only suppression tombstones to
 prevent the trusted feed reintroducing it; full database removal also clears those tombstones.
 
+Plan's built-in database copy preserves exact durable referral rows for replacement backup/restore
+and transfers into an empty referral store. Two populated referral stores, or server-identity
+rewriting with referral history, are refused before destination changes; independent journal
+cursors and erasure tombstones are never guessed or merged. Source capture is a consistent
+transaction bounded to 200,000 rows and 64 MiB; larger histories require a native database backup.
+Clean-stop process proof is deliberately invalidated on transfer, so restoring an older snapshot
+cannot turn an unobserved period into known downtime.
+Native database dumps bypass this safeguard: after restoring a dump containing the referral
+tables, while Plan is stopped and before starting it, run `DELETE FROM plan_referral_stops;`
+against that restored Plan database. Preserve all other referral tables. An old backup's process
+proof cannot establish what happened between the backup and the restoration.
+
 Exact active intervals are recorded prospectively from Plan's AFK decisions. The manual AFK command
 first resolves existing idle time so it cannot retrospectively convert an old idle gap into active
 time. Historical session AFK totals are never distributed across invented day boundaries.

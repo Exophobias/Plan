@@ -315,6 +315,7 @@ public abstract class Transaction {
 
     public enum IsolationLevel {
         UNCHANGED,
-        READ_COMMITTED
+        READ_COMMITTED,
+        REPEATABLE_READ
     }
 }

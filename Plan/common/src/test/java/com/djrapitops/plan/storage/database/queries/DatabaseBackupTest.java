@@ -270,6 +270,7 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
             expected.put(WebPermissionTable.TABLE_NAME, beforeBackupTo.get(WebPermissionTable.TABLE_NAME));
             expected.put(WebGroupToPermissionTable.TABLE_NAME, beforeBackupTo.get(WebGroupToPermissionTable.TABLE_NAME));
             expected.put(RegistrationTable.TABLE_NAME, 0);
+            com.djrapitops.plan.referrals.ReferralTables.NAMES.forEach(table -> expected.put(table, 0));
             Map<String, Integer> result = backup.query(LookupTableQueries.tableCounts());
             assertEquals(expected, result);
 
@@ -279,6 +280,50 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
         } finally {
             backup.close();
         }
+    }
+
+    @Test
+    default void referralBackupRoundTripPreservesDurableFactsAndRefusesHistoryMerge() throws Exception {
+        File tempFile = Files.createTempFile(dataFolder().toPath(), "referral-backup-", ".db").toFile();
+        tempFile.deleteOnExit();
+        SQLiteDB backup = dbSystem().getSqLiteFactory().usingFile(tempFile);
+        backup.setTransactionExecutorServiceProvider(MoreExecutors::newDirectExecutorService);
+        try {
+            backup.init();
+            saveDataForBackup(db(),serverUUID());
+            String server = serverUUID().toString();
+            String claimId = "a".repeat(32), stream = "b".repeat(32);
+            var claim = new com.djrapitops.plan.referrals.ReferralAnalyticsService.Claim(claimId,playerUUID,"successful",1000,1100,2000,9000,true,false,false);
+            var award = new com.djrapitops.plan.referrals.ReferralAnalyticsService.Award("credit",claimId,"credit","CAD",500,3000,4000,3500,"delivered");
+            var batch = new com.djrapitops.plan.referrals.ReferralAnalyticsService.Batch(stream,0,2,2,5000,100,false,List.of(
+                    new com.djrapitops.plan.referrals.ReferralAnalyticsService.Event(1,2000,claim,null),
+                    new com.djrapitops.plan.referrals.ReferralAnalyticsService.Event(2,4000,null,award)));
+            com.djrapitops.plan.referrals.ReferralTables.commit(db(),new com.djrapitops.plan.referrals.ReferralJournal.Apply(serverUUID().asUUID(),batch,6000)).join();
+            db().executeInTransaction("INSERT INTO plan_referral_members (server_uuid,uuid,first_join) VALUES (?,?,?)",server,playerUUID.toString(),1000).join();
+            db().executeInTransaction("INSERT INTO plan_referral_activity (server_uuid,uuid,session_start,session_end,valid,intervals) VALUES (?,?,?,?,?,?)",
+                    server,playerUUID.toString(),1000,5000,1,"[{\"start\":1000,\"end\":5000}]").join();
+            db().executeInTransaction("INSERT INTO plan_referral_coverage (run_id,server_uuid,start_ms,end_ms,flushed_at) VALUES (?,?,?,?,?)","run",server,1000,5000,6000).join();
+            db().executeInTransaction("INSERT INTO plan_referral_deleted (uuid) VALUES (?)",player2UUID.toString()).join();
+            db().executeInTransaction("INSERT INTO plan_referral_stops (server_uuid,process_token,stopped_at) VALUES (?,?,?)",server,"old-process",6000).join();
+            Gson json = new Gson();
+            String expected = json.toJson(com.djrapitops.plan.referrals.ReferralTransfer.capture(db()));
+            List<String> feedback = new ArrayList<>();
+            new DatabaseCopyProcessor(new Locale(),new TestErrorLogger(),db(),backup,feedback::add,DatabaseCopyProcessor.Strategy.CLEAR_DESTINATION_DATABASE).run();
+            assertEquals(expected,json.toJson(com.djrapitops.plan.referrals.ReferralTransfer.capture(backup)));
+            Map<String,Integer> counts = backup.query(LookupTableQueries.tableCounts());
+            for (String table : com.djrapitops.plan.referrals.ReferralTables.NAMES) {
+                int expectedCount = table.endsWith("stops") ? 0 : table.endsWith("events") || table.endsWith("latest") ? 2 : 1;
+                assertEquals(expectedCount,counts.get(table),table);
+            }
+            // Refuse before unrelated destination tables are changed, even when both histories look equal.
+            feedback.clear();
+            new DatabaseCopyProcessor(new Locale(),new TestErrorLogger(),db(),backup,feedback::add).run();
+            org.junit.jupiter.api.Assertions.assertTrue(feedback.stream().anyMatch(line -> line.contains("refused before destination changes")));
+            assertEquals(counts,backup.query(LookupTableQueries.tableCounts()));
+            new DatabaseCopyProcessor(new Locale(),new TestErrorLogger(),backup,db(),feedback::add,DatabaseCopyProcessor.Strategy.CLEAR_DESTINATION_DATABASE).run();
+            assertEquals(expected,json.toJson(com.djrapitops.plan.referrals.ReferralTransfer.capture(db())));
+            assertEquals(0,db().query(LookupTableQueries.tableCounts()).get("plan_referral_stops"));
+        } finally { backup.close(); }
     }
 
     private @NonNull Map<String, Object> getDataCorrectnessSet(Database db) {

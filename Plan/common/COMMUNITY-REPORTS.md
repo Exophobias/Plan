@@ -5,13 +5,22 @@ It requires authentication, explicit native `page.server.reports`, and `access.s
 page permissions, forum self access, anonymous mode and static dashboard exports do not grant it.
 Generation does not publish to Discord or the website.
 
-## Measurement contract (schema 1)
+## Measurement contract (schema 2)
 
-Requests to `/v1/community-report` take `server`, `start` and exclusive `end`, as ISO UTC calendar
+Requests to `/v1/community-report` take `server`, `start` and exclusive `end`, as ISO Vancouver calendar
 dates. The UI includes both selected dates and converts the end. Ranges are 1–366 days. Today is
 partial through confirmed observations. `period.recorded_from` and `as_of` identify the actual
 included times; a pre-collection start is clipped and labelled partial. Internal coverage gaps
 withhold totals rather than silently treating unknown activity as zero.
+
+Dates use `America/Vancouver`, labelled **Pacific Time (Vancouver)**. This applies to selection,
+midnight boundaries, daily activity and return cohorts; stored instants remain UTC epoch milliseconds.
+Schema 2 replaces schema 1's UTC calendar interpretation, so older clients must refresh. A current
+month is complete only after its final Vancouver day ends; earlier requests are month-to-date.
+Following [B.C.'s March 2026 decision](https://news.gov.bc.ca/releases/2026AG0013-000209), Vancouver
+stays at UTC-7 from 2026-03-08T10:00:00Z, including November. Both Java and browser helpers pin this
+rule for runtimes with older timezone data. Earlier dates use historical IANA Vancouver rules,
+including 23/25-hour transition days; no fixed 24-hour arithmetic splits measured intervals.
 
 - Participants: distinct account UUIDs with at least five measured active minutes in the period.
   Accounts are not guaranteed distinct humans. Character changes do not create new participants.
@@ -22,9 +31,9 @@ withhold totals rather than silently treating unknown activity as zero.
   Recent unresolved time is withheld. This is Plan's AFK classification, not proof of attention.
 - Peak online: peak distinct overlapping recorded sessions, with simultaneous departures and
   arrivals combined at their timestamp. It is a connected count, not the five-minute cohort size.
-- Daily participants: the five-minute rule applied independently each UTC day. Daily unique counts
+- Daily participants: the five-minute rule applied independently each Vancouver day. Daily unique counts
   are not added to obtain period uniques. A real observed zero day stays on the chart.
-- First-week return: accounts first observed in the requested period whose next seven UTC calendar
+- First-week return: accounts first observed in the requested period whose next seven Vancouver calendar
   days have elapsed with complete coverage. A return requires five active minutes on at least one
   day numbered 1–7 after the first-observation date. This is not exact D7 retention. The distinct
   return observation cutoff is included in the exported page and text.
@@ -36,7 +45,7 @@ response drives the preview PNG, downloaded PNG, public text and companion data.
 
 ## Selection and disclosure
 
-The initial release provides activity and return pages. Unavailable gameplay/event histories and
+The report provides activity, weekly busy-times and return pages. Unavailable gameplay/event histories and
 editorial integrations are not placeholders. Missing or irrelevant zero summary cards disappear;
 operators can hide eligible sections and the canvas reflows. An empty result produces no image.
 
@@ -47,6 +56,17 @@ whole chart is omitted. Return publication requires at least ten eligible accoun
 both returned and not-returned cells. These are conservative product defaults, not a mathematical
 anonymity guarantee. Operators must review combined figures and previously shared overlapping
 ranges before publication; public arbitrary-range queries are not exposed.
+
+The busy-times heatmap requires a complete period of at least seven local days and ten qualifying
+period participants. Its 168 Monday-to-Sunday hourly cells show **average simultaneous active
+accounts**: unioned non-AFK account milliseconds divided by the actual wall milliseconds of all
+matching weekday/hour occurrences in the selected range. Repeated historical autumn hours count
+twice in both numerator and denominator; a skipped spring hour has no exposure. A positive cell
+needs five accounts with at least five active minutes in that cell across the period and no account
+contributing more than half the cell's activity. Small/concentrated/unobserved cells are null,
+recorded quiet cells are zero, and a heatmap with no publishable positive cells disappears entirely.
+Public `busy_times` contains only `metric: average_active_players` and cells with `day` (Monday=1),
+`hour` (0–23) and nullable `average_active_players`; identities and cell population counts stay private.
 
 ## Collection and persistence
 

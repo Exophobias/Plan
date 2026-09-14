@@ -3,7 +3,7 @@ import {useParams} from 'react-router';
 import {Alert, Button, Card, Form} from 'react-bootstrap';
 import {useCommunityReport} from '../../dataHooks/communityReportHook.js';
 import {availableReportSections, createPublicReport, publicReportText, REPORT_SECTIONS, reportPreset,
-    reportRange, reportTimestamp, utcDate} from '../../util/communityReport.js';
+    reportDate, reportRange, reportTimestamp, REPORT_TIMEZONE_LABEL, utcDate} from '../../util/communityReport.js';
 import {renderCommunityReport} from '../../util/communityReportCanvas.js';
 import '../../style/reports.css';
 
@@ -77,15 +77,15 @@ function Reports({identifier}) {
                         }}>
                             <option value="month">Last complete month</option><option value="yesterday">Yesterday</option><option value="custom">Custom dates</option>
                         </Form.Select></Form.Group>
-                    <Form.Group controlId="report-start"><Form.Label>Start date · UTC</Form.Label>
-                        <Form.Control type="date" required value={dates.start} max={dates.end || utcDate(Date.now())}
+                    <Form.Group controlId="report-start"><Form.Label>Start date</Form.Label>
+                        <Form.Control type="date" required value={dates.start} max={dates.end || reportDate(Date.now())}
                             onChange={event => { setPreset('custom'); changeDates({...dates, start: event.target.value}); }}/></Form.Group>
-                    <Form.Group controlId="report-end"><Form.Label>End date · UTC</Form.Label>
-                        <Form.Control type="date" required value={dates.end} min={dates.start} max={utcDate(Date.now())}
+                    <Form.Group controlId="report-end"><Form.Label>End date</Form.Label>
+                        <Form.Control type="date" required value={dates.end} min={dates.start} max={reportDate(Date.now())}
                             onChange={event => { setPreset('custom'); changeDates({...dates, end: event.target.value}); }}/></Form.Group>
                     <Button type="submit" disabled={isFetching}>{isFetching ? 'Generating…' : 'Generate preview'}</Button>
                 </div>
-                <p className="small mb-0 mt-3">Both dates are included. Choose up to 366 days. Today produces a partial report through the available data cutoff.</p>
+                <p className="small mb-0 mt-3">{REPORT_TIMEZONE_LABEL}. Both dates are included. Choose up to 366 days. Today produces a partial report through the available data cutoff. Generate a complete monthly report after midnight on the first of the next month.</p>
                 {inputError && <Alert variant="warning" className="mt-3 mb-0" role="alert">{inputError}</Alert>}
             </Form>
         </Card.Body></Card>

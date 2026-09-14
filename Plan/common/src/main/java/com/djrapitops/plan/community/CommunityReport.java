@@ -25,8 +25,8 @@ public final class CommunityReport {
     public static void validateDates(LocalDate start, LocalDate end, long now) {
         if (start == null || end == null || start.isBefore(LocalDate.of(2000, 1, 1))
                 || !end.isAfter(start) || ChronoUnit.DAYS.between(start, end) > 366
-                || end.isAfter(Instant.ofEpochMilli(now).atOffset(ZoneOffset.UTC).toLocalDate().plusDays(1)))
-            throw new IllegalArgumentException("Select between one and 366 UTC calendar days, ending no later than today");
+                || end.isAfter(CommunityCalendar.date(now).plusDays(1)))
+            throw new IllegalArgumentException("Select between one and 366 Vancouver calendar days, ending no later than today");
     }
 
     public static Map<String, Object> load(Database database, UUID server, LocalDate start, LocalDate end, long now) {
@@ -101,7 +101,7 @@ public final class CommunityReport {
         if (dailySafe) {
             Map<Long, Integer> dailyCounts = dailyCounts(activity, from, requestedEnd);
             for (LocalDate date = start; date.isBefore(end); date = date.plusDays(1)) {
-                long a = epoch(date), b = epoch(date.plusDays(1));
+                long a = epoch(date);
                 int count = dailyCounts.getOrDefault(a, 0);
                 if (count > 0 && count < MIN_CELL) { dailySafe = false; break; }
                 // Active hours per day are deliberately not published: they can expose one dominant player.
@@ -113,16 +113,23 @@ public final class CommunityReport {
             omit(omissions, "activity_chart", "A complete multi-day period with publishable daily groups is required");
         }
 
+        List<Map<String, Object>> busyCells = complete && ChronoUnit.DAYS.between(start, end) >= 7
+                && summary.get("participants") != null ? CommunityBusyTimes.calculate(activity, from, requestedEnd) : List.of();
+        if (busyCells.isEmpty())
+            omit(omissions, "busy_times", "A complete period of at least seven days and safely publishable hourly groups is required");
+        else if (busyCells.stream().anyMatch(cell -> cell.get("average_active_players") == null))
+            omit(omissions, "busy_times", "Some hourly cells are withheld because observations are absent, small or concentrated");
+
         long eligible = 0, returned = 0;
         for (Member member : data.members) {
             if (member.firstSeen < from || member.firstSeen >= Math.min(requestedEnd, now)) continue;
-            LocalDate joined = Instant.ofEpochMilli(member.firstSeen).atOffset(ZoneOffset.UTC).toLocalDate();
-            long firstReturn = epoch(joined.plusDays(1)), lastReturn = epoch(joined.plusDays(8));
+            LocalDate joined = CommunityCalendar.date(member.firstSeen);
+            long lastReturn = epoch(joined.plusDays(8));
             if (lastReturn > observedThrough || !covered(member.firstSeen, lastReturn, coverage)) continue;
             eligible++;
             List<Span> personal = activity.getOrDefault(member.uuid, List.of());
-            for (long day = firstReturn; day < lastReturn; day += DAY) {
-                if (duration(personal, day, day + DAY) >= QUALIFYING) { returned++; break; }
+            for (LocalDate day = joined.plusDays(1); day.isBefore(joined.plusDays(8)); day = day.plusDays(1)) {
+                if (duration(personal, epoch(day), epoch(day.plusDays(1))) >= QUALIFYING) { returned++; break; }
             }
         }
         Map<String, Object> retention = map("eligible", null, "returned", null, "rate", null, "observed_through", observedThrough);
@@ -130,10 +137,12 @@ public final class CommunityReport {
             retention.put("eligible", eligible); retention.put("returned", returned); retention.put("rate", returned / (double) eligible);
         } else omit(omissions, "retention", "Return observations are incomplete or the groups are too small to publish safely");
         boolean ready = summary.values().stream().anyMatch(Objects::nonNull) || retention.get("rate") != null;
-        return map("schema_version", 1, "status", ready ? "ready" : usable ? "empty" : "unavailable",
-                "period", map("start_date", start.toString(), "end_date", end.toString(), "timezone", "UTC",
+        return map("schema_version", 2, "status", ready ? "ready" : usable ? "empty" : "unavailable",
+                "period", map("start_date", start.toString(), "end_date", end.toString(), "timezone", CommunityCalendar.TIMEZONE,
                         "recorded_from", Math.max(0, from), "as_of", Math.max(0, until), "complete", complete),
-                "summary", summary, "daily", daily, "retention", retention, "omissions", omissions);
+                "summary", summary, "daily", daily,
+                "busy_times", map("metric", "average_active_players", "cells", busyCells),
+                "retention", retention, "omissions", omissions);
     }
 
     private static Map<String, List<Span>> activity(List<Session> sessions) {
@@ -212,7 +221,8 @@ public final class CommunityReport {
             for (Span span : spans) {
                 long cursor = Math.max(from, span.start), end = Math.min(until, span.end);
                 while (cursor < end) {
-                    long day = cursor / DAY * DAY, through = Math.min(end, day + DAY);
+                    LocalDate date = CommunityCalendar.date(cursor);
+                    long day = epoch(date), through = Math.min(end, epoch(date.plusDays(1)));
                     millis.merge(day, through - cursor, Long::sum); cursor = through;
                 }
             }
@@ -236,7 +246,7 @@ public final class CommunityReport {
     }
     private static boolean safeSplit(long cell, long total) { return cell >= MIN_CELL && total - cell >= MIN_CELL; }
     private static void omit(List<Map<String, Object>> omissions, String section, String reason) { omissions.add(map("section", section, "reason", reason)); }
-    static long epoch(LocalDate date) { return date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(); }
+    static long epoch(LocalDate date) { return CommunityCalendar.start(date); }
     static Map<String, Object> map(Object... values) {
         Map<String, Object> out = new LinkedHashMap<>();
         for (int i = 0; i < values.length; i += 2) out.put((String) values[i], values[i + 1]);

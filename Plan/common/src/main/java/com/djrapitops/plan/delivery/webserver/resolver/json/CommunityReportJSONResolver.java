@@ -38,7 +38,7 @@ public class CommunityReportJSONResolver implements Resolver {
             LocalDate end = date(request.getQuery().get("end").orElse(""));
             return Optional.of(response(200, analytics.report(server, start, end)));
         } catch (IllegalArgumentException | DateTimeParseException invalid) {
-            return Optional.of(response(400, Map.of("error", "Invalid server or UTC date range (maximum 366 days)")));
+            return Optional.of(response(400, Map.of("error", "Invalid server or Vancouver date range (maximum 366 days)")));
         } catch (IllegalStateException | java.util.concurrent.CompletionException unavailable) {
             return Optional.of(response(503, Map.of("error", "Report unavailable; try again or select a shorter period")));
         }

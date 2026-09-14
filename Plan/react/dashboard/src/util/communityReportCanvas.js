@@ -108,6 +108,48 @@ function returning(ctx, page) {
     text(ctx, `Return observations through ${reportTimestamp(r.observed_through)}.`, 70, 1100 + height + 18, 23, C.muted);
 }
 
+function busyTimes(ctx, page) {
+    text(ctx, 'Average active players', 70, 348, 32, C.white, 700);
+    paragraph(ctx, page.definition, 70, 390, 940, 24, C.muted, 31);
+    const left = 150, top = 492, column = 860 / 24, row = 72, width = column - 3, height = row - 9;
+    const maximum = Math.max(...page.busy_times.cells.map(cell => cell.average_active_players || 0));
+    const colour = value => {
+        if (!value) return C.panel;
+        const fraction = value / maximum;
+        const low = [95, 85, 57], high = [216, 184, 106];
+        return `rgb(${low.map((component, index) => Math.round(component + (high[index] - component) * fraction)).join(',')})`;
+    };
+    const withheld = (x, y, w, h) => {
+        ctx.fillStyle = C.background; ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#7b8b9e'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+        ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        for (let offset = -h; offset < w; offset += 10) line(ctx, x + offset, y + h, x + offset + h, y, C.grid);
+        ctx.restore();
+    };
+    text(ctx, 'Hour · Pacific Time (Vancouver)', left, 459, 23, C.muted);
+    for (let hour = 0; hour < 24; hour += 3) {
+        ctx.textAlign = 'center'; text(ctx, String(hour).padStart(2, '0'), left + (hour + .5) * column, 480, 20, C.muted);
+    }
+    ctx.textAlign = 'left';
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach((day, index) => text(ctx, day, 70, top + index * row + 40, 25, C.muted));
+    page.busy_times.cells.forEach(cell => {
+        const x = left + cell.hour * column, y = top + (cell.day - 1) * row;
+        if (cell.average_active_players === null) withheld(x, y, width, height);
+        else { ctx.fillStyle = colour(cell.average_active_players); ctx.fillRect(x, y, width, height); }
+    });
+    const scaleLeft = 150, scaleTop = 1034, scaleWidth = 500;
+    for (let pixel = 0; pixel < scaleWidth; pixel++) {
+        ctx.fillStyle = colour(maximum * (pixel + 1) / scaleWidth); ctx.fillRect(scaleLeft + pixel, scaleTop, 1, 22);
+    }
+    text(ctx, 'Lower', scaleLeft, scaleTop + 52, 22, C.muted);
+    ctx.textAlign = 'right'; text(ctx, formatReportNumber(maximum, 2) + ' average players', scaleLeft + scaleWidth,
+        scaleTop + 52, 22, C.muted); ctx.textAlign = 'left';
+    ctx.fillStyle = C.panel; ctx.fillRect(70, 1120, 30, 24);
+    text(ctx, 'Recorded quiet', 113, 1140, 23, C.muted);
+    withheld(430, 1120, 30, 24); text(ctx, 'Withheld or unavailable', 473, 1140, 23, C.muted);
+    paragraph(ctx, 'Brighter cells show more activity. Each column is one hour, from 00 through 23.', 70, 1192, 940, 23, C.muted, 29);
+}
+
 // Preview and download share this exact raster. No screenshots, external fonts or image dependencies.
 export function drawCommunityReport(canvas, report, pageIndex) {
     const page = report.pages[pageIndex];
@@ -122,7 +164,9 @@ export function drawCommunityReport(canvas, report, pageIndex) {
     text(ctx, page.title, 70, 176, 58, C.white, 700);
     text(ctx, reportPeriodLabel(report.period), 70, 231, 28, C.muted);
     line(ctx, 70, 271, 1010, 271, C.gold, 2);
-    if (page.id === 'activity') activity(ctx, page); else returning(ctx, page);
+    if (page.id === 'activity') activity(ctx, page);
+    else if (page.id === 'busy-times') busyTimes(ctx, page);
+    else returning(ctx, page);
     text(ctx, `${report.period.complete ? 'Recorded' : 'Partial period · recorded'} ${reportTimestamp(report.period.recorded_from)}`, 70, 1280, 22, C.muted);
     text(ctx, `through ${reportTimestamp(report.period.as_of)}`, 70, 1310, 22, C.muted);
     ctx.textAlign = 'right'; text(ctx, `${pageIndex + 1} / ${report.pages.length}`, 1010, 1302, 21, C.muted); ctx.textAlign = 'left';

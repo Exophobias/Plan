@@ -1,0 +1,36 @@
+.referrals-page, .referrals-analytics { min-width: 0; }
+#content-wrapper:has(.referrals-page) { min-width: 0; }
+.referrals-analytics .card-body { min-width: 0; }
+.referrals-coverage { overflow-wrap: anywhere; }
+.referrals-chart-toolbar { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: end; }
+.referrals-chart-toolbar .form-select { min-width: 15rem; max-width: 100%; }
+.referrals-empty { padding: 2rem 1rem; text-align: center; }
+.referrals-analytics .table-responsive { max-width: 100%; }
+.referrals-table { font-variant-numeric: tabular-nums; }
+.referrals-table th, .referrals-table td { vertical-align: middle; }
+.referrals-table th:not(:first-child), .referrals-table td { text-align: right; }
+.referrals-table th:first-child { min-width: 10rem; }
+.referrals-table td { white-space: nowrap; }
+.referrals-heatmap { min-width: 38rem; border-collapse: separate; border-spacing: 4px; font-variant-numeric: tabular-nums; }
+.referrals-heatmap th { white-space: nowrap; }
+.referrals-heatmap td, .referrals-heatmap th:not(:first-child) { text-align: center; vertical-align: middle; }
+.referrals-heatmap .referrals-cell { background: rgba(184,151,77,var(--retention-opacity)); color: inherit; }
+.referrals-heatmap small { display: block; white-space: nowrap; }
+.referrals-cell-empty { background: rgba(128,128,128,.07) !important; }
+.referrals-funnel { list-style: none; padding: 0; margin-bottom: 1rem; display: grid; gap: .85rem; }
+.referrals-funnel li { display: grid; grid-template-columns: 1fr auto; gap: .3rem .75rem; }
+.referrals-funnel-track { grid-column: 1 / -1; height: .5rem; background: rgba(128,128,128,.15); border-radius: .25rem; overflow: hidden; }
+.referrals-funnel-track div { height: 100%; background: #b8974d; }
+.referrals-outcomes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem 1rem; }
+.referrals-outcomes div { display: flex; justify-content: space-between; gap: .5rem; }
+.referrals-outcomes dt { font-weight: 400; }
+.referrals-outcomes dd { margin: 0; font-variant-numeric: tabular-nums; }
+.referrals-methodology > summary { padding: 1rem 1.25rem; cursor: pointer; }
+.referrals-methodology { color: var(--color-text); }
+.referrals-analytics details > summary { font-weight: 600; }
+.referrals-analytics .chart-area { width: 100%; min-width: 0; }
+@media (max-width: 575px) {
+    .referrals-analytics .card-body { padding: 1rem; }
+    .referrals-chart-toolbar > * { width: 100%; }
+    .referrals-chart-toolbar .form-select { min-width: 0; }
+}

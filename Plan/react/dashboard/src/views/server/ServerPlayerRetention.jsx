@@ -2,6 +2,7 @@ import React from 'react';
 import {useParams} from "react-router";
 import {useAuth} from "../../hooks/authenticationHook.tsx";
 import PlayerRetention from "../../components/cards/common/PlayerRetention.jsx";
+import ReferralSummary from "../../components/cards/server/ReferralSummary.jsx";
 
 const ServerPlayerRetention = () => {
     const {hasPermission} = useAuth();
@@ -9,7 +10,8 @@ const ServerPlayerRetention = () => {
 
     const seeRetention = hasPermission('page.server.retention');
     return (
-        <PlayerRetention id={"server-retention"} identifier={identifier} seeRetention={seeRetention}/>
+        <><ReferralSummary identifier={identifier}/>
+            <PlayerRetention id={"server-retention"} identifier={identifier} seeRetention={seeRetention}/></>
     )
 };
 

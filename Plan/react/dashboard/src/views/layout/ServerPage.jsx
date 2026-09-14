@@ -34,12 +34,15 @@ import {fetchServerIdentity} from "../../service/serverService";
 import {ServerExtensionContextProvider, useServerExtensionContext} from "../../hooks/serverExtensionDataContext";
 import {iconTypeToFontAwesomeClass} from "../../util/icons.ts";
 import {staticSite} from "../../service/backendConfiguration";
+import {canViewReferrals} from "../../util/referralAnalytics.js";
 
 const HelpModal = React.lazy(() => import("../../components/modal/HelpModal"));
 
 const ServerSidebar = () => {
     const {t, i18n} = useTranslation();
-    const {authRequired} = useAuth();
+    const auth = useAuth();
+    const {authRequired} = auth;
+    const seeReferrals = canViewReferrals(auth, staticSite);
     const {sidebarItems, setSidebarItems} = useNavigation();
     const {extensionData} = useServerExtensionContext();
 
@@ -113,6 +116,12 @@ const ServerSidebar = () => {
                         href: "retention",
                         permission: 'page.server.retention'
                     },
+                    ...(seeReferrals ? [{
+                        name: 'Referrals',
+                        icon: faUserGroup,
+                        href: 'referrals',
+                        permission: 'page.server.referrals'
+                    }] : []),
                     {
                         name: 'html.label.playerList',
                         icon: faUserGroup,
@@ -171,7 +180,7 @@ const ServerSidebar = () => {
             .filter(item => !item.authRequired || (authRequired && item.authRequired))
         setSidebarItems(items);
         window.document.title = `Plan | Server Analysis`;
-    }, [t, i18n, extensionData, setSidebarItems, authRequired])
+    }, [t, i18n, extensionData, setSidebarItems, authRequired, seeReferrals])
 
     return (
         <Sidebar items={sidebarItems}/>

@@ -4,56 +4,35 @@ import {Navigate} from "react-router";
 import React, {useEffect, useState} from "react";
 import {staticSite} from "../../service/backendConfiguration";
 import ActionButton from "../input/button/ActionButton.tsx";
+import {redirectLoadingState} from "../../util/redirectState.js";
 
-const RedirectPlaceholder = () => {
+const RedirectPlaceholder = ({failed = false}) => {
     const [redirectStart] = useState(Date.now())
     const [dateDiff, setDateDiff] = useState(0)
 
     useEffect(() => {
         const interval = setInterval(() => {
-            if (dateDiff <= 50) {
+            if (redirectLoadingState(dateDiff, failed) === 'loading') {
                 setDateDiff(Date.now() - redirectStart);
             } else {
                 clearInterval(interval);
             }
         }, 500);
         return () => clearInterval(interval);
-    }, [redirectStart, dateDiff])
+    }, [redirectStart, dateDiff, failed])
 
-    if (dateDiff > 50) {
-        return <>
-            <p style={{marginLeft: "14rem"}}></p>
-            <p className="m-4">Redirecting..</p>
-            <div style={{maxWidth: "500px"}}>
-                <p className="m-4">
-                    This is taking longer than expected.
-                </p>
-                <p className="m-4">
-                    Make sure the Plan webserver is enabled.<br/>(This page can show up if the Plan webserver goes
-                    offline.)
-                </p>
-                <p className="m-4">
-                    If you are trying to set up a development environment,
-                    change package.json "proxy" to address of your Plan webserver.
-                </p>
-                <p className="m-4">
-                    <ActionButton onClick={() => window.location.reload()}>Click to Refresh the
-                        page & try again.
-                    </ActionButton>
-                </p>
-            </div>
-        </>
-    } else {
-        return <>
-            <p style={{marginLeft: "14rem"}}></p>
-            <p className="m-4">Redirecting..</p>
-        </>
-    }
+    const state = redirectLoadingState(dateDiff, failed);
+    return <div className="m-4" style={{maxWidth: '500px'}}>
+        <p role={failed ? 'alert' : 'status'}>{state === 'error'
+            ? 'Your analytics could not be loaded. Please try again.'
+            : state === 'delayed' ? 'Loading your analytics is taking longer than expected.' : 'Loading your analytics…'}</p>
+        {state !== 'loading' && <ActionButton onClick={() => window.location.reload()}>Try again</ActionButton>}
+    </div>;
 }
 
 const MainPageRedirect = () => {
-    const {authLoaded, authRequired, loggedIn, user, hasPermission} = useAuth();
-    const {isProxy, serverName, serverUUID} = useMetadata();
+    const {authLoaded, authRequired, loggedIn, user, hasPermission, loginError} = useAuth();
+    const {isProxy, serverName, serverUUID, metadataError} = useMetadata();
 
     if (staticSite) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -62,6 +41,8 @@ const MainPageRedirect = () => {
             return (<Navigate to={redirect} replace={true}/>)
         }
     }
+
+    if (loginError || metadataError) return <RedirectPlaceholder failed/>;
 
     if (!authLoaded || !serverName || !serverUUID) {
         return <RedirectPlaceholder/>

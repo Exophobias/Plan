@@ -122,13 +122,17 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
         feedback.accept(locale.getString(CommandLang.DB_COPY_LIST_TITLE_SOURCE));
         tableCounts.forEach((key, value) -> feedback.accept(locale.getString(CommandLang.DB_COPY_LIST_ROW, key, value)));
 
+        final com.djrapitops.plan.store.StoreTransfer.Snapshot store;
         final ReferralTransfer.Snapshot referrals;
         try {
+            store = com.djrapitops.plan.store.StoreTransfer.capture(fromDB);
+            com.djrapitops.plan.store.StoreTransfer.preflight(toDB,store,strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
+                    strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
             referrals = ReferralTransfer.capture(fromDB);
             ReferralTransfer.preflight(toDB, referrals, strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
                     strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
         } catch (RuntimeException refusal) {
-            feedback.accept("Referral analytics transfer refused before destination changes. Use a full replacement or native database backup.");
+            feedback.accept("Analytics transfer refused before destination changes. Use a full replacement or native database backup.");
             return;
         }
 
@@ -171,6 +175,7 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
             LookupTable<Integer> statisticsIdLookupTable = copyStatistics();
             copyStatisticValues(statisticsIdLookupTable, userIdLookupTable, serverIdLookupTable);
             ReferralTransfer.restore(toDB, referrals);
+            com.djrapitops.plan.store.StoreTransfer.restore(toDB,store);
             // TODO plan how to copy extension data https://github.com/plan-player-analytics/Plan/wiki/Database-Schema
 
             feedback.accept(locale.getString(CommandLang.PROGRESS_SUCCESS));

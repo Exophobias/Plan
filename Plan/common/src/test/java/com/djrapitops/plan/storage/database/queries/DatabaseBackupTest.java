@@ -271,6 +271,7 @@ public interface DatabaseBackupTest extends DatabaseTestPreparer {
             expected.put(WebGroupToPermissionTable.TABLE_NAME, beforeBackupTo.get(WebGroupToPermissionTable.TABLE_NAME));
             expected.put(RegistrationTable.TABLE_NAME, 0);
             com.djrapitops.plan.referrals.ReferralTables.NAMES.forEach(table -> expected.put(table, 0));
+            com.djrapitops.plan.store.StoreTables.NAMES.forEach(table -> expected.put(table, 0));
             Map<String, Integer> result = backup.query(LookupTableQueries.tableCounts());
             assertEquals(expected, result);
 

@@ -45,6 +45,7 @@ public class ApiServices {
     private final SettingsSvc settingsService;
     private final SchedulerSvc schedulerService;
     private final com.djrapitops.plan.referrals.ReferralAnalyticsSvc referralAnalytics;
+    private final com.djrapitops.plan.store.StoreAnalyticsSvc storeAnalytics;
 
     @Inject
     public ApiServices(
@@ -56,7 +57,8 @@ public class ApiServices {
             ListenerSvc listenerService,
             SettingsSvc settingsService,
             SchedulerSvc schedulerService,
-            com.djrapitops.plan.referrals.ReferralAnalyticsSvc referralAnalytics
+            com.djrapitops.plan.referrals.ReferralAnalyticsSvc referralAnalytics,
+            com.djrapitops.plan.store.StoreAnalyticsSvc storeAnalytics
     ) {
         this.componentService = componentService;
         this.resolverService = resolverService;
@@ -67,6 +69,7 @@ public class ApiServices {
         this.settingsService = settingsService;
         this.schedulerService = schedulerService;
         this.referralAnalytics = referralAnalytics;
+        this.storeAnalytics = storeAnalytics;
     }
 
     public void register() {
@@ -86,8 +89,11 @@ public class ApiServices {
 
     public void disableExtensionDataUpdates() {
         referralAnalytics.disable();
+        storeAnalytics.disable();
         extensionService.disableUpdates();
     }
+
+    public com.djrapitops.plan.store.StoreAnalyticsSvc getStoreAnalytics() { return storeAnalytics; }
 
     public com.djrapitops.plan.referrals.ReferralAnalyticsSvc getReferralAnalytics() { return referralAnalytics; }
 

@@ -34,6 +34,9 @@ public class CreateIndexTransaction extends Transaction {
 
     @Override
     protected void performOperations() {
+        createIndex(com.djrapitops.plan.store.StoreTables.EVENTS,"plan_store_event_time_index","server_uuid","event_at");
+        createIndex(com.djrapitops.plan.store.StoreTables.EVENTS,"plan_store_event_order_index","server_uuid","order_id");
+        createIndex(com.djrapitops.plan.store.StoreTables.LATEST,"plan_store_latest_order_index","server_uuid","order_id");
         createIndex(UsersTable.TABLE_NAME, "plan_users_uuid_index", UsersTable.USER_UUID);
         createIndex(ServerTable.TABLE_NAME, "plan_servers_uuid_index", ServerTable.SERVER_UUID);
 

@@ -29,6 +29,7 @@ import com.djrapitops.plan.storage.database.transactions.patches.BadJoinAddressD
 
 public interface DatabaseTestAggregate extends
         com.djrapitops.plan.referrals.ReferralDatabaseTest,
+        com.djrapitops.plan.store.StoreDatabaseTest,
         ActivityIndexQueriesTest,
         AllowlistQueriesTest,
         DatabaseBackupTest,

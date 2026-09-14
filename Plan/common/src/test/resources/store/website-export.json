@@ -1,0 +1,341 @@
+{
+    "schema_version": 1,
+    "server_id": "1",
+    "stream_id": "e76eae6d37c879dae64bd84f938f909c",
+    "from_exclusive": 0,
+    "through_inclusive": 18,
+    "high_watermark": 18,
+    "source_as_of": 1789391491,
+    "has_more": false,
+    "snapshot": "eyJzdHJlYW1faWQiOiJlNzZlYWU2ZDM3Yzg3OWRhZTY0YmQ4NGY5MzhmOTA5YyIsInNlcnZlcl9pZCI6IjEiLCJoaWdoX3dhdGVybWFyayI6MTgsInNvdXJjZV9hc19vZiI6MTc4OTM5MTQ5MX0.74c72d78dd04bd58a816aa391c075def4d858b6cacf9a7c380d5bf31a040cbd8",
+    "coverage": {
+        "capture_started_at": 1789391491,
+        "legacy_snapshot_at": 1789391491,
+        "legacy_records": 3,
+        "adjustments_complete": false
+    },
+    "events": [
+        {
+            "sequence": 1,
+            "recorded_at": 1789391491,
+            "type": "order",
+            "record": {
+                "order_id": "2cc8d093467b5efd37175f0808fabdda4169e4eb01e8effe8d464e6676016beb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "payer_uuid": null,
+                "recipient_uuid": null,
+                "created_at": 1789390491,
+                "currency": "CAD",
+                "amount_cents": 900,
+                "lines": [
+                    {
+                        "product_id": "03969db3046387385d42aea8b0a3ea151541367db5b3c86c31c17671be1bfba0",
+                        "name": "Steel & Gold",
+                        "quantity": 2,
+                        "unit_cents": 450
+                    }
+                ],
+                "legacy": true
+            }
+        },
+        {
+            "sequence": 2,
+            "recorded_at": 1789391491,
+            "type": "payment",
+            "record": {
+                "payment_id": "63e181b62a2435dcfd9e21d6b9fa34d3a8651301e4f4d84329bc2616d43e150d",
+                "order_id": "2cc8d093467b5efd37175f0808fabdda4169e4eb01e8effe8d464e6676016beb",
+                "status": "pending",
+                "previous_status": null,
+                "origin": "unknown",
+                "amount_cents": 900,
+                "currency": "CAD",
+                "created_at": null,
+                "state_recorded_at": null,
+                "legacy": true
+            }
+        },
+        {
+            "sequence": 3,
+            "recorded_at": 1789391491,
+            "type": "credit_funding",
+            "record": {
+                "order_id": "2cc8d093467b5efd37175f0808fabdda4169e4eb01e8effe8d464e6676016beb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "gross_cents": 900,
+                "credit_cents": 0,
+                "cash_cents": 900,
+                "currency": "CAD",
+                "state": "reserved",
+                "created_at": null,
+                "state_recorded_at": null,
+                "legacy": true
+            }
+        },
+        {
+            "sequence": 4,
+            "recorded_at": 1789391491,
+            "type": "credit_funding",
+            "record": {
+                "order_id": "2cc8d093467b5efd37175f0808fabdda4169e4eb01e8effe8d464e6676016beb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "gross_cents": 900,
+                "credit_cents": 0,
+                "cash_cents": 900,
+                "currency": "CAD",
+                "state": "captured",
+                "created_at": null,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 5,
+            "recorded_at": 1789391491,
+            "type": "payment",
+            "record": {
+                "payment_id": "63e181b62a2435dcfd9e21d6b9fa34d3a8651301e4f4d84329bc2616d43e150d",
+                "order_id": "2cc8d093467b5efd37175f0808fabdda4169e4eb01e8effe8d464e6676016beb",
+                "status": "completed",
+                "previous_status": "pending",
+                "origin": "paypal",
+                "amount_cents": 900,
+                "currency": "CAD",
+                "created_at": null,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 6,
+            "recorded_at": 1789391491,
+            "type": "order",
+            "record": {
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "payer_uuid": "11111111-2222-4333-8444-555555555555",
+                "recipient_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "created_at": 1789391491,
+                "currency": "USD",
+                "amount_cents": 1000,
+                "lines": [
+                    {
+                        "product_id": "03969db3046387385d42aea8b0a3ea151541367db5b3c86c31c17671be1bfba0",
+                        "name": "Steel & Gold",
+                        "quantity": 1,
+                        "unit_cents": 1000
+                    }
+                ],
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 7,
+            "recorded_at": 1789391491,
+            "type": "credit_award",
+            "record": {
+                "award_id": "337db5b0a3f19916fa5fc96179abae9af02a6721187305fbc8e52d7c3c6bf1b6",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "amount_cents": 50,
+                "currency": "USD",
+                "created_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 8,
+            "recorded_at": 1789391491,
+            "type": "credit_funding",
+            "record": {
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "gross_cents": 1000,
+                "credit_cents": 50,
+                "cash_cents": 950,
+                "currency": "USD",
+                "state": "reserved",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 9,
+            "recorded_at": 1789391491,
+            "type": "payment",
+            "record": {
+                "payment_id": "e857ce75f2d75d2be64f558d0541aa63dbe789ba5cf9808a9522894c8b91a4f1",
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "status": "pending",
+                "previous_status": null,
+                "origin": "paypal",
+                "amount_cents": 950,
+                "currency": "USD",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 10,
+            "recorded_at": 1789391491,
+            "type": "credit_funding",
+            "record": {
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "gross_cents": 1000,
+                "credit_cents": 50,
+                "cash_cents": 950,
+                "currency": "USD",
+                "state": "captured",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 11,
+            "recorded_at": 1789391491,
+            "type": "payment",
+            "record": {
+                "payment_id": "e857ce75f2d75d2be64f558d0541aa63dbe789ba5cf9808a9522894c8b91a4f1",
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "status": "completed",
+                "previous_status": "pending",
+                "origin": "paypal",
+                "amount_cents": 950,
+                "currency": "USD",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 12,
+            "recorded_at": 1789391491,
+            "type": "adjustment",
+            "record": {
+                "adjustment_id": "d5d37d44026632c6e4bb0180d44743ca022e8cec774200852c107f5c5ab49e3d",
+                "payment_id": "e857ce75f2d75d2be64f558d0541aa63dbe789ba5cf9808a9522894c8b91a4f1",
+                "kind": "refund",
+                "amount_cents": 400,
+                "currency": "USD",
+                "created_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 13,
+            "recorded_at": 1789391491,
+            "type": "credit_funding",
+            "record": {
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "gross_cents": 1000,
+                "credit_cents": 50,
+                "cash_cents": 950,
+                "currency": "USD",
+                "state": "refunded",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 14,
+            "recorded_at": 1789391491,
+            "type": "payment",
+            "record": {
+                "payment_id": "e857ce75f2d75d2be64f558d0541aa63dbe789ba5cf9808a9522894c8b91a4f1",
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "status": "refunded",
+                "previous_status": "completed",
+                "origin": "paypal",
+                "amount_cents": 950,
+                "currency": "USD",
+                "created_at": 1789391491,
+                "state_recorded_at": 1789391491,
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 15,
+            "recorded_at": 1789391491,
+            "type": "order",
+            "record": {
+                "order_id": "d643c8062c189e655d597fa6fd0d4eb66d6f5ffe7500a093dc3c4b557eae117a",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "payer_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "recipient_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "created_at": 1789391491,
+                "currency": "USD",
+                "amount_cents": 333,
+                "lines": [
+                    {
+                        "product_id": "03969db3046387385d42aea8b0a3ea151541367db5b3c86c31c17671be1bfba0",
+                        "name": "Renamed",
+                        "quantity": 1,
+                        "unit_cents": 333
+                    }
+                ],
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 16,
+            "recorded_at": 1789391491,
+            "type": "order",
+            "record": {
+                "order_id": "269a3cf4aff7ff10dc8038318a55c8e6a04158e995189940122a612a8d28e32a",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "payer_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "recipient_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "created_at": 1789391491,
+                "currency": "USD",
+                "amount_cents": 100,
+                "lines": [
+                    {
+                        "product_id": "03969db3046387385d42aea8b0a3ea151541367db5b3c86c31c17671be1bfba0",
+                        "name": "Renamed",
+                        "quantity": 1,
+                        "unit_cents": 100
+                    }
+                ],
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 17,
+            "recorded_at": 1789391491,
+            "type": "order",
+            "record": {
+                "order_id": "a1244492bf4e26a7a6d200d536bc043fa504f753608f47a257c6455b1b2691b6",
+                "payer_key": "ea967be5980a63f7878d7c3f3d49c1d4c6dddfed61bb04b23b96fc35b58cd857",
+                "payer_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "recipient_uuid": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "created_at": 1789391491,
+                "currency": "USD",
+                "amount_cents": 100,
+                "lines": [
+                    {
+                        "product_id": "03969db3046387385d42aea8b0a3ea151541367db5b3c86c31c17671be1bfba0",
+                        "name": "Renamed",
+                        "quantity": 1,
+                        "unit_cents": 100
+                    }
+                ],
+                "legacy": false
+            }
+        },
+        {
+            "sequence": 18,
+            "recorded_at": 1789391491,
+            "type": "deletion",
+            "record": {
+                "order_id": "9b27089058935af634c8d06985e4ee87475ea2596710ee983d82fdb66e7667fb",
+                "payment_id": "e857ce75f2d75d2be64f558d0541aa63dbe789ba5cf9808a9522894c8b91a4f1",
+                "recorded_at": 1789391491
+            }
+        }
+    ]
+}

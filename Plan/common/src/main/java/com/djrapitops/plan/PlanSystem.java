@@ -155,6 +155,7 @@ public class PlanSystem implements SubSystem {
                 webServerSystem,
                 serverInfo,
                 apiServices.getReferralAnalytics(),
+                apiServices.getStoreAnalytics(),
                 importSystem,
                 exportSystem,
                 cacheSystem,

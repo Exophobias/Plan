@@ -37,6 +37,7 @@ public class RemoveEverythingTransaction extends Patch {
 
     @Override
     protected void applyPatch() {
+        com.djrapitops.plan.store.StoreTables.NAMES.forEach(this::clearTable);
         com.djrapitops.plan.referrals.ReferralTables.NAMES.forEach(this::clearTable);
         clearTable(GeoInfoTable.TABLE_NAME);
         clearTable(NicknamesTable.TABLE_NAME);

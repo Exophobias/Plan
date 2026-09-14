@@ -51,7 +51,7 @@ import java.util.Set;
 
 import static com.djrapitops.plan.settings.forumauth.ForumAuthConfig.invalid;
 
-/** Strict physical parsing and the explicit 0 -> 1 adoption migration. */
+/** Strict physical parsing and explicit sequential migrations: 0 -> 1 -> 2. */
 final class ForumAuthConfigLoader {
 
     private static final String RESOURCE = "/assets/plan/forum-auth.yml";
@@ -106,8 +106,22 @@ final class ForumAuthConfigLoader {
             return result;
         }
 
-        // Explicit schema edge 0 -> 1: all existing choices retain their original meaning.
-        // The bundled version wins only because this migration deliberately transforms that key.
+        for (int migrating = sourceVersion; migrating < ForumAuthConfig.CURRENT_VERSION; migrating++) {
+            switch (migrating) {
+                case 0 -> { /* 0 -> 1 adopts the independent schema without changing existing choices. */ }
+                case 1 -> {
+                    // 1 -> 2 raises the permitted lifetime; preserve the old implicit 15-minute
+                    // duration as well as explicit administrator values. Only fresh files get 14 days.
+                    if (installed.getValue().stream().noneMatch(tuple -> "session-seconds".equals(key(tuple)))) {
+                        installed.getValue().add(new NodeTuple(
+                                new ScalarNode(Tag.STR, "session-seconds", null, null, DumperOptions.ScalarStyle.PLAIN),
+                                new ScalarNode(Tag.INT, "900", null, null, DumperOptions.ScalarStyle.PLAIN)));
+                    }
+                }
+                default -> throw invalid("missing sequential schema migration");
+            }
+        }
+        // The current template replaces the version only after every sequential edge has run.
         installed.getValue().removeIf(tuple -> "config-version".equals(key(tuple)));
         MappingNode candidate = overlay(template, installed);
         settings(candidate, "migrated");

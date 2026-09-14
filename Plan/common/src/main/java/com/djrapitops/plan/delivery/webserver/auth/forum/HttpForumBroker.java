@@ -136,7 +136,7 @@ public final class HttpForumBroker implements ForumBroker {
                     || !uuid.matches("[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}")
                     || !revision.matches("[A-Za-z0-9_-]{1,128}")
                     || !"forum".equals(string(object, "auth_method"))
-                    || authTime <= 0 || expires < 1 || expires > 900 || recheck < 1 || recheck > 60) {
+                    || authTime <= 0 || expires < 1 || expires > ForumAuthConfig.MAX_SESSION_SECONDS || recheck < 1 || recheck > 60) {
                 throw new IllegalArgumentException();
             }
             return new ForumIdentity(issuer, subject, UUID.fromString(uuid), revision, authTime, (int) expires, (int) recheck);

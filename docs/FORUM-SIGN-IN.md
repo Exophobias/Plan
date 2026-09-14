@@ -36,9 +36,11 @@ users with self access to their own UUID page.
    load provides no forum sign-in. Configuration is not watched or reloaded on each request.
 5. Complete acceptance with controlled forum/Minecraft test identities before announcing availability.
 
-The independent `forum-auth.yml` schema starts at `config-version: 1`. A physically unversioned file
-is schema 0 and migrates with an exact private backup and atomic replacement, preserving explicit
-values and unknown keys. Malformed, duplicate, null and future versions are rejected without rewriting
+The independent `forum-auth.yml` schema is `config-version: 2`. A physically unversioned file
+is schema 0 and follows explicit `0 -> 1 -> 2` migrations with an exact private backup and atomic
+replacement, preserving explicit values, credentials and unknown keys. Schema 1's implicit 900-second
+duration is preserved too; set `session-seconds: 1209600` explicitly to extend an existing installation.
+Fresh files default to 14 days. Malformed, duplicate, null and future versions are rejected without rewriting
 the file. It does not alter the upstream `config.yml` schema. Endpoint URLs derive from the configured
 forum HTTPS origin, not browser input. The exact callback path is fixed; changing its hostname requires
 matching registration on both sides.
@@ -48,7 +50,8 @@ matching registration on both sides.
 - A login transaction lasts at most five minutes and is bound to a host-only, secure browser cookie.
   The forum's single-use authorization code lasts 60 seconds and requires both the recorded state
   and PKCE S256 verifier plus the server-held client secret for redemption.
-- Sessions last at most 15 minutes (`session-seconds`, default 900) from authentication. Eligibility
+- Sessions last at most 14 days (`session-seconds`, fresh default and maximum 1209600) from authentication.
+  The browser receives a persistent Secure, HttpOnly, SameSite=Lax cookie with that remaining lifetime. Eligibility
   is checked at most 60 seconds apart (`recheck-seconds`, default 60), with bounded five-second
   network exchanges (`timeout-seconds`, configurable up to 10). Checks never extend session expiry.
 - Session records persist in `plan_forum_sessions`, separately from local password accounts. Only
@@ -67,6 +70,13 @@ matching registration on both sides.
   separate analytics entitlement mapping in this release.
 - Sign-out deletes the server session. A storage failure reports that sign-out could not complete;
   retry instead of assuming the session has been revoked. Full Plan data reset clears forum sessions.
+  Saves and deletions require confirmed transaction commit, not merely a completed database future.
+  Revoked hashes remain blocked in memory for the maximum session lifetime across configuration and
+  eligibility-cache clears. They are never evicted to admit another marker; reaching 10,000 pauses
+  forum sign-in until a reload successfully invalidates all saved sessions. Final authorization also
+  rereads the same saved session under the revocation lock, fencing an in-flight deletion.
+  A failed, unacknowledged deletion is not promised durable across a process restart; a surviving
+  saved session must pass fresh forum eligibility verification before it can be used again.
 - Login errors direct the player to check account activation and Minecraft verification and retry.
   Missing or pending links show an explanation and an Account Connections link on the forum. This
   requires a verified Minecraft account association, not a roleplay character record.

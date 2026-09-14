@@ -85,10 +85,10 @@ class ForumAuthConfigTest {
         assertEquals("https://forums.patriam.cc/plan-auth/authorize", config.getAuthorizeUrl().toString());
         assertEquals("https://forums.patriam.cc/plan-auth/token", config.getTokenUrl().toString());
         assertEquals("https://forums.patriam.cc/plan-auth/check", config.getCheckUrl().toString());
-        assertEquals(900, config.getSessionSeconds());
+        assertEquals(1209600, config.getSessionSeconds());
         assertEquals(60, config.getRecheckSeconds());
         assertEquals(5, config.getTimeoutSeconds());
-        assertEquals(1, config.getInstalledVersion());
+        assertEquals(2, config.getInstalledVersion());
         assertEquals("created", config.getState());
         assertEquals(template(), Files.readString(file()));
         assertTrue(backups().isEmpty());
@@ -97,7 +97,7 @@ class ForumAuthConfigTest {
 
     @Test
     void currentFileDoesNotRewriteAdministratorFormatting() throws IOException {
-        String current = "# Administrator comment\r\nconfig-version: 1\r\nsession-seconds: 123\r\n";
+        String current = "# Administrator comment\r\nconfig-version: 2\r\nsession-seconds: 123\r\n";
         Files.writeString(file(), current);
         ForumAuthConfig config = ForumAuthConfig.load(file());
         assertEquals(123, config.getSessionSeconds());
@@ -111,6 +111,34 @@ class ForumAuthConfigTest {
         Files.writeString(file(), "{}\n");
         assertEquals("migrated", ForumAuthConfig.load(file()).getState());
         assertEquals("{}\n", Files.readString(backups().get(0)));
+        assertEquals(900,ForumAuthConfig.load(file()).getSessionSeconds());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "session-seconds: 900\n", "session-seconds: 123\n"})
+    void schemaOnePreservesExistingDurationAndUnknownsWithExactPrivateBackup(String duration) throws IOException {
+        String original = "config-version: 1\n" + duration + "extension: {keep: true}\nclient-secret: '" + "s".repeat(43) + "'\n";
+        Files.writeString(file(),original);
+        ForumAuthConfig migrated = ForumAuthConfig.load(file());
+        assertEquals(2,migrated.getInstalledVersion());
+        assertEquals(duration.contains("123") ? 123 : 900,migrated.getSessionSeconds());
+        assertEquals("s".repeat(43),migrated.getClientSecret());
+        assertEquals(original,Files.readString(backups().get(0)));
+        assertOwnerOnly(backups().get(0));
+        assertEquals(Map.of("keep",true),((Map<?,?>)new Yaml().load(Files.readString(file()))).get("extension"));
+        String installed = Files.readString(file());
+        assertEquals("current",ForumAuthConfig.load(file()).getState());
+        assertEquals(installed,Files.readString(file()));
+        assertEquals(1,backups().size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1,900,901,1209600})
+    void currentSchemaAcceptsBoundedExplicitSessionDurations(int duration) throws IOException {
+        String original = "config-version: 2\nsession-seconds: " + duration + "\n";
+        Files.writeString(file(),original);
+        assertEquals(duration,ForumAuthConfig.load(file()).getSessionSeconds());
+        assertEquals(original,Files.readString(file()));
     }
 
     @ParameterizedTest
@@ -156,7 +184,7 @@ class ForumAuthConfigTest {
             "config-version:", "config-version: null", "config-version: ~", "config-version: ''",
             "config-version: '1'", "config-version: \"1\"", "'config-version': 1", "config-version: -1",
             "config-version: 1.0", "config-version: false", "config-version: 01", "config-version: +1",
-            "config-version: 0x1", "config-version: 1_0", "config-version: 2", "config-version: 2147483648",
+            "config-version: 0x1", "config-version: 1_0", "config-version: 3", "config-version: 2147483648",
             "config-version: !!int 1", "!!str config-version: 1", "config-version: &version 1",
             "config-version: 0\nconfig-version: 1", "config-version: 0\n'config-version': 1",
             "config-version: [1]", "config-version: {x: 1}", "secret: null", "secret:",
@@ -179,7 +207,7 @@ class ForumAuthConfigTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "enabled: true", "enabled: yes", "enabled: 'false'", "session-seconds: 901",
+            "enabled: true", "enabled: yes", "enabled: 'false'", "session-seconds: 1209601",
             "session-seconds: 0", "session-seconds: '900'", "session-seconds: 9.5", "recheck-seconds: 61",
             "recheck-seconds: 0", "timeout-seconds: 11", "timeout-seconds: 0", "client-id: ''",
             "client-secret: \"secret\\nwith-newline\"", "forum-url: 'http://forums.patriam.cc'",

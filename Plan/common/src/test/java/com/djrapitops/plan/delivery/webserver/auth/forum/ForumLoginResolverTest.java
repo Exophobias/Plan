@@ -55,11 +55,11 @@ class ForumLoginResolverTest {
     @Test
     void callbackIssuesSecureSessionOnlyFromValidatedResult() throws IOException {
         when(service.isEnabled()).thenReturn(true);
-        when(service.complete("code", "state", "browser")).thenReturn(new ForumAuthService.LoginResult("forum1_cookie", "/player/uuid", 123));
+        when(service.complete("code", "state", "browser")).thenReturn(new ForumAuthService.LoginResult("forum1_cookie", "/player/uuid", 1209600));
         Response response = resolve("GET", "/auth/forum/callback?code=code&state=state", Map.of("Cookie", "other=value; __Host-plan-login=browser"));
         assertEquals(302, response.getCode());
         assertEquals("/player/uuid", response.getHeaders().get("Location"));
-        assertEquals("auth=forum1_cookie; Path=/; Max-Age=123; SameSite=Lax; Secure; HttpOnly", response.getHeaders().get("Set-Cookie"));
+        assertEquals("auth=forum1_cookie; Path=/; Max-Age=1209600; SameSite=Lax; Secure; HttpOnly", response.getHeaders().get("Set-Cookie"));
         assertEquals("no-store", response.getHeaders().get("Cache-Control"));
         assertEquals("no-referrer", response.getHeaders().get("Referrer-Policy"));
     }

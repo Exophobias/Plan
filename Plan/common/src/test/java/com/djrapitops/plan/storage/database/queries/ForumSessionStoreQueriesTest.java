@@ -35,7 +35,7 @@ public interface ForumSessionStoreQueriesTest extends DatabaseTestPreparer {
 
     private ForumSessionStore.Session forumSession(long expires) {
         ForumIdentity identity = new ForumIdentity("https://forums.example.test", "42", playerUUID,
-                "verified-link-revision", System.currentTimeMillis() / 1000, 3600, 60);
+                "verified-link-revision", System.currentTimeMillis() / 1000, 1209600, 60);
         return new ForumSessionStore.Session(identity, DigestUtils.sha256Hex("client-config"), expires);
     }
 
@@ -59,7 +59,7 @@ public interface ForumSessionStoreQueriesTest extends DatabaseTestPreparer {
     @Test
     default void forumSessionRestartPreservesIdentityAndOriginalAbsoluteExpiry() throws IOException {
         String cookieHash = DigestUtils.sha256Hex(UUID.randomUUID().toString());
-        long originalExpiry = System.currentTimeMillis() + 12_345;
+        long originalExpiry = System.currentTimeMillis() + 1209600_000L;
         ForumSessionStore.Session expected = forumSession(originalExpiry);
         new DatabaseForumSessionStore(dbSystem()).save(cookieHash, expected);
 
@@ -82,6 +82,8 @@ public interface ForumSessionStoreQueriesTest extends DatabaseTestPreparer {
 
         store.remove(first);
         store.remove(first);
+        forcePersistenceCheck();
+        store = new DatabaseForumSessionStore(dbSystem());
 
         assertTrue(store.find(first).isEmpty());
         assertEquals(session, store.find(second).orElseThrow());

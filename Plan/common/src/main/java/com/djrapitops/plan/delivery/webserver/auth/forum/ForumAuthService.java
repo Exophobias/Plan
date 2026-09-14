@@ -21,6 +21,8 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Forum identity and sessions never enter Plan's local password or group tables. */
 @Singleton
@@ -35,14 +37,15 @@ public final class ForumAuthService {
             .expireAfterWrite(Duration.ofMinutes(5)).build();
     private final Cache<String, Checked> checked = Caffeine.newBuilder().maximumSize(4096)
             .expireAfterWrite(Duration.ofMinutes(15)).build();
-    // Retain revocation independently of configuration/check-cache swaps. Only real sessions can
-    // populate this cache, and no session can outlive its fifteen-minute marker.
-    private final Cache<String, Boolean> revoked = Caffeine.newBuilder().maximumSize(10000)
-            .expireAfterWrite(Duration.ofMinutes(15)).build();
+    // Guarded by this. Never evict a live revocation: cache pressure cannot revive a saved cookie.
+    // Only existing sessions can add entries; exhausting the bound pauses all forum authentication.
+    static final int MAX_REVOCATIONS = 10000;
+    private final Map<String, Long> revoked = new HashMap<>();
     private final File folder;
     private final ForumSessionStore sessions;
     private final PluginLogger logger;
     private final Clock clock;
+    private final int revocationLimit;
     private volatile Generation generation;
     // Guarded by this: a failed pause must finish revoking saved sessions before re-enabling.
     private boolean invalidationRequired;
@@ -59,10 +62,16 @@ public final class ForumAuthService {
     }
 
     ForumAuthService(File folder, ForumSessionStore sessions, PluginLogger logger, Clock clock) {
+        this(folder, sessions, logger, clock, MAX_REVOCATIONS);
+    }
+
+    ForumAuthService(File folder, ForumSessionStore sessions, PluginLogger logger, Clock clock, int revocationLimit) {
+        if (revocationLimit < 1 || revocationLimit > MAX_REVOCATIONS) throw new IllegalArgumentException("Invalid revocation bound");
         this.folder = folder;
         this.sessions = sessions;
         this.logger = logger;
         this.clock = clock;
+        this.revocationLimit = revocationLimit;
     }
 
     ForumAuthService(ForumAuthConfig config, ForumBroker broker, ForumSessionStore sessions, Clock clock) {
@@ -70,6 +79,7 @@ public final class ForumAuthService {
         this.logger = null;
         this.sessions = sessions;
         this.clock = clock;
+        this.revocationLimit = MAX_REVOCATIONS;
         configure(config, broker);
     }
 
@@ -126,6 +136,7 @@ public final class ForumAuthService {
     private void finishInvalidation() throws IOException {
         if (!invalidationRequired) return;
         sessions.removeAll();
+        revoked.clear();
         invalidationRequired = false;
     }
 
@@ -201,7 +212,7 @@ public final class ForumAuthService {
         Generation active = generation;
         if (active == null || !active.config().isEnabled() || !isForumCookie(cookie)) return null;
         String key = hash(cookie);
-        if (revoked.getIfPresent(key) != null) return null;
+        if (isRevoked(key)) return null;
         try {
             Optional<ForumSessionStore.Session> found = sessions.find(key);
             if (found.isEmpty() || generation != active) return null;
@@ -241,8 +252,9 @@ public final class ForumAuthService {
             ForumPermissions permissions = sessions.linkedPermissions(identity.minecraftUUID())
                     .orElseGet(() -> new ForumPermissions("forum-self", SELF_PERMISSIONS));
             synchronized (this) {
-                if (generation != active || revoked.getIfPresent(key) != null || !current.accepted()
+                if (generation != active || isRevoked(key) || !current.accepted()
                         || clock.millis() >= session.expires()) return null;
+                if (!sessions.find(key).filter(session::equals).isPresent() || clock.millis() >= session.expires()) return null;
                 return new ForumUser(username, playerName, identity, permissions);
             }
         } catch (IOException | RuntimeException unavailable) {
@@ -259,9 +271,28 @@ public final class ForumAuthService {
         sessions.remove(key);
     }
 
-    private synchronized void markRevoked(String key) {
-        revoked.put(key, Boolean.TRUE);
+    private synchronized void markRevoked(String key) throws IOException {
+        long now = clock.millis();
+        revoked.entrySet().removeIf(entry -> entry.getValue() <= now);
+        if (!revoked.containsKey(key) && revoked.size() >= revocationLimit) {
+            if (logger != null && generation != null)
+                logger.warn("Forum sign-in paused: revocation capacity reached. Reload after session storage is healthy to invalidate saved sessions.");
+            generation = null;
+            pending.invalidateAll();
+            checked.invalidateAll();
+            invalidationRequired = true;
+            throw new IOException("Forum sign-in paused: revocation capacity requires saved-session invalidation");
+        }
+        revoked.put(key, now + ForumAuthConfig.MAX_SESSION_SECONDS * 1000L);
         checked.invalidate(key);
+    }
+
+    private synchronized boolean isRevoked(String key) {
+        Long until = revoked.get(key);
+        if (until == null) return false;
+        if (clock.millis() < until) return true;
+        revoked.remove(key);
+        return false;
     }
 
     private long recheckMillis(Generation active, ForumIdentity identity) {

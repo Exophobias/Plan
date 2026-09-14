@@ -66,7 +66,7 @@ class HttpForumBrokerTest {
                 Arguments.of("link_revision", "\"\""), Arguments.of("link_revision", "\"revision with spaces\""),
                 Arguments.of("auth_method", "\"discord\""), Arguments.of("auth_time", "0"),
                 Arguments.of("auth_time", "\"1800000000\""), Arguments.of("auth_time", "1.1"),
-                Arguments.of("auth_time", "1e9"), Arguments.of("expires_in", "901"),
+                Arguments.of("auth_time", "1e9"), Arguments.of("expires_in", "1209601"),
                 Arguments.of("expires_in", "-1"), Arguments.of("check_after", "61"),
                 Arguments.of("check_after", "0"), Arguments.of("check_after", "true"));
     }
@@ -101,6 +101,17 @@ class HttpForumBrokerTest {
         assertEquals(original.authTime(), checked.authTime());
         assertEquals(original.expiresIn(), checked.expiresIn());
         assertEquals(30, checked.checkAfter());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {900,901,1209600})
+    void boundedLongSessionAndRechecksKeepOriginalAbsoluteAuthentication(int seconds) throws IOException {
+        JsonObject response = validJson(); response.addProperty("expires_in",seconds);
+        ForumIdentity original = HttpForumBroker.parse(response.toString(),ISSUER);
+        assertEquals(seconds,original.expiresIn());
+        response.addProperty("auth_time",1900000000); response.addProperty("expires_in",1209600);
+        ForumIdentity rechecked = HttpForumBroker.parseCheck(response.toString(),ISSUER,original);
+        assertEquals(original.authTime(),rechecked.authTime()); assertEquals(seconds,rechecked.expiresIn());
     }
 
     @Test

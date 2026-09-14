@@ -401,9 +401,10 @@ class ForumAuthServiceTest {
     }
 
     private void writeConfiguration(boolean enabled) throws IOException {
-        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 1\nenabled: " + enabled
+        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 2\nenabled: " + enabled
                 + "\nforum-url: " + config.getForumUrl() + "\nclient-id: " + config.getClientId()
-                + "\nclient-secret: " + config.getClientSecret() + "\ncallback-url: " + config.getCallbackUrl() + "\n");
+                + "\nclient-secret: " + config.getClientSecret() + "\ncallback-url: " + config.getCallbackUrl()
+                + "\nsession-seconds: " + config.getSessionSeconds() + "\n");
     }
 
     @Test
@@ -599,6 +600,101 @@ class ForumAuthServiceTest {
         when(config.isEnabled()).thenReturn(false);
         assertFalse(service.isEnabled());
         assertThrows(IOException.class, service::begin);
+    }
+
+    private void longSessions() throws IOException {
+        when(config.getSessionSeconds()).thenReturn(ForumAuthConfig.MAX_SESSION_SECONDS);
+        when(broker.redeem(anyString(),anyString(),anyString())).thenAnswer(ignored ->
+                new ForumIdentity(ISSUER,"42",PLAYER,"link-revision-1",clock.millis()/1000,ForumAuthConfig.MAX_SESSION_SECONDS,60));
+        service.configure(config,broker);
+    }
+
+    @Test
+    void fourteenDaySessionSurvivesFifteenMinutesAndRestartButNeverItsAbsoluteExpiry() throws IOException {
+        longSessions();
+        ForumAuthService.LoginResult login = complete(service.begin());
+        assertEquals(1209600,login.maxAge());
+        long expiry = sessions.rows.get(ForumAuthService.hash(login.cookie())).expires();
+        clock.advance(900001);
+        assertNotNull(service.authenticate(login.cookie()));
+        service = new ForumAuthService(config,broker,sessions,clock);
+        assertNotNull(service.authenticate(login.cookie()));
+        verify(broker,times(2)).check(any());
+        sessions.permissions.put(PLAYER,new ForumPermissions("empty",List.of()));
+        assertEquals(List.of(),service.authenticate(login.cookie()).getPermissions());
+        clock.advance(expiry-clock.millis()-1);
+        assertNotNull(service.authenticate(login.cookie()));
+        assertEquals(expiry,sessions.rows.get(ForumAuthService.hash(login.cookie())).expires());
+        clock.advance(1);
+        assertNull(service.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"logout","refusal"})
+    void failedDeletionRemainsRevokedBeyondOldCacheLifetimeAndConfigurationReload(String cause) throws IOException {
+        longSessions();
+        String cookie = complete(service.begin()).cookie();
+        sessions.removeUnavailable = true;
+        if (cause.equals("logout")) assertThrows(IOException.class,() -> service.logout(cookie));
+        else {
+            when(broker.check(any())).thenThrow(new ForumVerificationRefusedException());
+            clock.advance(60000); assertNull(service.authenticate(cookie));
+        }
+        doReturn(identity()).when(broker).check(any());
+        clock.advance(3600000);
+        service.configure(config,broker);
+        assertNull(service.authenticate(cookie));
+        assertFalse(sessions.rows.isEmpty());
+        // An unacknowledged failed write cannot promise restart durability; fresh verification is mandatory.
+        when(broker.check(any())).thenThrow(new ForumVerificationRefusedException());
+        assertNull(new ForumAuthService(config,broker,sessions,clock).authenticate(cookie));
+        sessions.removeUnavailable = false;
+        service.logout(cookie);
+        assertNull(new ForumAuthService(config,broker,sessions,clock).authenticate(cookie));
+    }
+
+    @Test
+    void revocationCapacityNeverEvictsAndRequiresConfirmedGlobalInvalidation() throws IOException {
+        service = new ForumAuthService(directory.toFile(),sessions,logger,clock,2);
+        service.configure(config,broker);
+        String first = complete(service.begin()).cookie(), second = complete(service.begin()).cookie(), third = complete(service.begin()).cookie();
+        sessions.removeUnavailable = true;
+        assertThrows(IOException.class,() -> service.logout(first));
+        assertThrows(IOException.class,() -> service.logout(second));
+        assertNull(service.authenticate(first));
+        assertThrows(IOException.class,() -> service.logout(third));
+        assertFalse(service.isEnabled());
+        assertNull(service.authenticate(third));
+        verify(logger).warn("Forum sign-in paused: revocation capacity reached. Reload after session storage is healthy to invalidate saved sessions.");
+        assertThrows(IllegalStateException.class,() -> service.configure(config,broker));
+        writeConfiguration(true);
+        sessions.removeAllUnavailable = true;
+        service.initialize(true);
+        assertFalse(service.isEnabled()); assertEquals(3,sessions.rows.size());
+        sessions.removeAllUnavailable = false;
+        service.initialize(true);
+        assertTrue(service.isEnabled()); assertTrue(sessions.rows.isEmpty());
+        assertNull(service.authenticate(first)); assertNull(service.authenticate(third));
+    }
+
+    @Test
+    void deletionDuringPermissionsLookupIsRecheckedBeforeAuthorization() throws IOException {
+        String cookie = complete(service.begin()).cookie();
+        sessions.beforePermissions = () -> sessions.rows.remove(ForumAuthService.hash(cookie));
+        assertNull(service.authenticate(cookie));
+    }
+
+    @Test
+    void completedDatabaseFutureWithoutACommittedMutationIsNotAcknowledged() {
+        var database = mock(com.djrapitops.plan.storage.database.Database.class);
+        var databases = mock(com.djrapitops.plan.storage.database.DBSystem.class);
+        when(databases.getDatabase()).thenReturn(database);
+        when(database.executeTransaction(any())).thenReturn(java.util.concurrent.CompletableFuture.completedFuture(null));
+        DatabaseForumSessionStore store = new DatabaseForumSessionStore(databases);
+        assertThrows(IOException.class,() -> store.remove("cookie-hash"));
+        assertThrows(IOException.class,store::removeAll);
+        assertThrows(IOException.class,() -> store.save("cookie-hash",new ForumSessionStore.Session(identity(),"config",clock.millis()+10000)));
     }
 
     private static final class MemorySessions implements ForumSessionStore {

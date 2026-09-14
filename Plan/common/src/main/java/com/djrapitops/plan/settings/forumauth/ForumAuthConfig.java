@@ -25,7 +25,8 @@ import java.util.Map;
 /** Immutable settings owned exclusively by the independent forum-auth.yml schema. */
 public final class ForumAuthConfig {
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 2;
+    public static final int MAX_SESSION_SECONDS = 14 * 24 * 60 * 60;
     private final boolean enabled;
     private final String forumUrl;
     private final String clientId;
@@ -57,7 +58,7 @@ public final class ForumAuthConfig {
                 || enabled && clientSecret.isEmpty()) {
             throw invalid("client-secret must be 43-128 base64url characters, or blank when disabled");
         }
-        sessionSeconds = bounded(values, "session-seconds", 1, 900);
+        sessionSeconds = bounded(values, "session-seconds", 1, MAX_SESSION_SECONDS);
         recheckSeconds = bounded(values, "recheck-seconds", 1, 60);
         timeoutSeconds = bounded(values, "timeout-seconds", 1, 10);
         this.state = state;

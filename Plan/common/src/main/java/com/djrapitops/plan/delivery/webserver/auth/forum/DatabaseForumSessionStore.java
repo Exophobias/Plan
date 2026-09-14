@@ -4,6 +4,8 @@ import com.djrapitops.plan.storage.database.DBSystem;
 import com.djrapitops.plan.storage.database.sql.tables.ForumSessionTable;
 import com.djrapitops.plan.storage.database.queries.objects.UserIdentifierQueries;
 import com.djrapitops.plan.storage.database.queries.objects.WebUserQueries;
+import com.djrapitops.plan.storage.database.transactions.ExecStatement;
+import com.djrapitops.plan.storage.database.transactions.Transaction;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
@@ -43,11 +45,11 @@ public final class DatabaseForumSessionStore implements ForumSessionStore {
     public void save(String cookieHash, Session session) throws IOException {
         ForumIdentity identity = session.identity();
         try {
-            await(databases.getDatabase().executeInTransaction("DELETE FROM " + ForumSessionTable.TABLE_NAME + " WHERE expires<=?", System.currentTimeMillis()));
-            await(databases.getDatabase().executeInTransaction("INSERT INTO " + ForumSessionTable.TABLE_NAME
+            mutate("DELETE FROM " + ForumSessionTable.TABLE_NAME + " WHERE expires<=?", System.currentTimeMillis());
+            mutate("INSERT INTO " + ForumSessionTable.TABLE_NAME
                             + " (cookie_hash,config_hash,issuer,forum_subject,mc_uuid,link_revision,auth_time,expires,session_seconds,check_seconds) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     cookieHash, session.configHash(), identity.issuer(), identity.subject(), identity.minecraftUUID().toString(),
-                    identity.revision(), identity.authTime(), session.expires(), identity.expiresIn(), identity.checkAfter()));
+                    identity.revision(), identity.authTime(), session.expires(), identity.expiresIn(), identity.checkAfter());
         } catch (RuntimeException failure) {
             throw new IOException("Forum session storage unavailable");
         }
@@ -56,7 +58,7 @@ public final class DatabaseForumSessionStore implements ForumSessionStore {
     @Override
     public void remove(String cookieHash) throws IOException {
         try {
-            await(databases.getDatabase().executeInTransaction("DELETE FROM " + ForumSessionTable.TABLE_NAME + " WHERE cookie_hash=?", cookieHash));
+            mutate("DELETE FROM " + ForumSessionTable.TABLE_NAME + " WHERE cookie_hash=?", cookieHash);
         } catch (RuntimeException failure) {
             throw new IOException("Forum session storage unavailable");
         }
@@ -65,10 +67,25 @@ public final class DatabaseForumSessionStore implements ForumSessionStore {
     @Override
     public void removeAll() throws IOException {
         try {
-            await(databases.getDatabase().executeInTransaction("DELETE FROM " + ForumSessionTable.TABLE_NAME));
+            mutate("DELETE FROM " + ForumSessionTable.TABLE_NAME);
         } catch (RuntimeException failure) {
             throw new IOException("Forum session storage unavailable");
         }
+    }
+
+    private void mutate(String sql, Object... values) throws IOException {
+        Transaction transaction = new Transaction() {
+            @Override protected void performOperations() {
+                execute(new ExecStatement(sql) {
+                    @Override public void prepare(java.sql.PreparedStatement statement) throws java.sql.SQLException {
+                        for (int i=0;i<values.length;i++) statement.setObject(i+1,values[i]);
+                    }
+                });
+            }
+        };
+        await(databases.getDatabase().executeTransaction(transaction));
+        // SQLDB may log an error and complete its wrapper future normally.
+        if (!transaction.wasSuccessful()) throw new IOException("Forum session storage did not commit");
     }
 
     private static void await(CompletableFuture<?> operation) throws IOException {

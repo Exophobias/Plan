@@ -27,6 +27,9 @@ export function validateReferrals(data) {
     if (!['players', ...REFERRAL_GROUPS].every(key => count(data.summary[key]))) invalid();
     if (data.summary.late_referral_is_subset !== true) invalid();
     if (!['requested', 'accepted', 'qualified', 'rewarded', 'verifying', 'pending', 'rejected', 'expired'].every(key => count(data.funnel[key]))) invalid();
+    if (!count(data.funnel.qualification_sample) || data.funnel.qualification_sample > data.funnel.qualified
+        || !optionalNumber(data.funnel.median_qualification_hours)
+        || (data.funnel.qualification_sample === 0) !== (data.funnel.median_qualification_hours === null)) invalid();
     const checkGroups = groups => {
         if (!Array.isArray(groups) || groups.length > 4 || new Set(groups.map(group => group.group)).size !== groups.length) invalid();
         groups.forEach(group => {

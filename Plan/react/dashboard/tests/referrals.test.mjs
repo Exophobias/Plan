@@ -6,6 +6,17 @@ import {redirectLoadingState} from '../src/util/redirectState.js';
 
 const staff = {authLoaded: true, loggedIn: true, user: {permissions: [REFERRALS_PERMISSION]}};
 
+test('qualification timing cannot present zero hours for an unobserved sample', () => {
+    const data = referralsFixture();
+    data.funnel.qualification_sample = 0;
+    data.funnel.median_qualification_hours = null;
+    assert.equal(validateReferrals(data), data);
+    data.funnel.median_qualification_hours = 0;
+    assert.throws(() => validateReferrals(data));
+    data.funnel.qualification_sample = 1;
+    assert.equal(validateReferrals(data), data);
+});
+
 test('redirect help waits ten seconds and reported loading errors are immediately retryable', () => {
     for (const elapsed of [0, 50, 500, 9999]) assert.equal(redirectLoadingState(elapsed), 'loading');
     for (const elapsed of [10000, 30000]) assert.equal(redirectLoadingState(elapsed), 'delayed');

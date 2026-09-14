@@ -140,6 +140,8 @@ function Funnel({data}) {
         <h3 className="h6 mt-4">Current claim outcomes</h3>
         <dl className="referrals-outcomes">{[['verifying', 'Verifying'], ['pending', 'Pending'], ['rejected', 'Rejected'], ['expired', 'Expired']].map(([key, label]) =>
             <div key={key}><dt>{label}</dt><dd>{number(data.funnel[key])}</dd></div>)}</dl>
+        <p className="small"><strong>Median claim to qualification: {number(data.funnel.median_qualification_hours)} hours</strong><br/>
+            {number(data.funnel.qualification_sample)} observed completed claims; historical claims with uncertain timing are excluded. This is elapsed time, including time offline and awaiting approval.</p>
         <p className="small mb-0">All recorded claims, including those from before activity collection and later rejected or expired claims. Reward delivered means at least one reward has been confirmed. Qualification is the recorded approval time after screening and reward eligibility checks.</p>
     </Panel>;
 }

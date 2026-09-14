@@ -163,7 +163,7 @@ test('image spec, companion text and JSON expose the Vancouver calendar and revi
     const data = fixture();
     const report = createPublicReport(data);
     assert.equal(report.schema_version, 2);
-    assert.equal(report.renderer_version, 2);
+    assert.equal(report.renderer_version, 3);
     assert.equal(report.period.timezone, REPORT_TIMEZONE);
     assert.equal(report.period.recorded_from, data.period.recorded_from);
     assert.equal(reportPeriodLabel(report.period), '2026-08-01 – 2026-08-03 · ' + REPORT_TIMEZONE_LABEL);

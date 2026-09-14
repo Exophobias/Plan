@@ -4,7 +4,7 @@ export {reportDate, REPORT_TIMEZONE, REPORT_TIMEZONE_LABEL, reportTimestamp};
 export const REPORT_PERMISSION = 'page.server.reports';
 export const DAY = 86400000;
 export const MAX_REPORT_DAYS = 366;
-export const RENDERER_VERSION = 2;
+export const RENDERER_VERSION = 3;
 export const REPORT_SECTIONS = {summary: 'Community totals', daily: 'Daily activity graph',
     busy_times: 'Busiest times heatmap', retention: 'First-week return'};
 

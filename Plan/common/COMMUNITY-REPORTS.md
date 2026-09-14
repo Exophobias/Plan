@@ -67,6 +67,8 @@ contributing more than half the cell's activity. Small/concentrated/unobserved c
 recorded quiet cells are zero, and a heatmap with no publishable positive cells disappears entirely.
 Public `busy_times` contains only `metric: average_active_players` and cells with `day` (Monday=1),
 `hour` (0–23) and nullable `average_active_players`; identities and cell population counts stay private.
+Renderer 3 uses a dark-green-to-bright-mint scale for increasing activity. Recorded quiet cells
+remain navy and withheld/unavailable cells remain hatched. The measurement schema remains 2.
 
 ## Collection and persistence
 

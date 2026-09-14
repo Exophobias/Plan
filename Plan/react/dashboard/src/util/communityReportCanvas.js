@@ -115,9 +115,11 @@ function busyTimes(ctx, page) {
     const maximum = Math.max(...page.busy_times.cells.map(cell => cell.average_active_players || 0));
     const colour = value => {
         if (!value) return C.panel;
-        const fraction = value / maximum;
-        const low = [95, 85, 57], high = [216, 184, 106];
-        return `rgb(${low.map((component, index) => Math.round(component + (high[index] - component) * fraction)).join(',')})`;
+        const stops = [[11, 93, 59], [18, 128, 71], [34, 197, 94], [134, 239, 172], [220, 252, 231]];
+        const position = Math.max(0, Math.min(1, value / maximum)) * (stops.length - 1);
+        const index = Math.min(stops.length - 2, Math.floor(position));
+        const fraction = position - index, low = stops[index], high = stops[index + 1];
+        return `rgb(${low.map((component, componentIndex) => Math.round(component + (high[componentIndex] - component) * fraction)).join(',')})`;
     };
     const withheld = (x, y, w, h) => {
         ctx.fillStyle = C.background; ctx.fillRect(x, y, w, h);

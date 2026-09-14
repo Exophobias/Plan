@@ -9,7 +9,7 @@ import static com.djrapitops.plan.referrals.ReferralAnalyticsService.Event;
 public final class ReferralEraseTransaction extends ReferralTables.Tx {
     private final String player;
     public ReferralEraseTransaction(UUID player) { this.player = player.toString(); }
-    @Override protected void performOperations() {
+    @Override protected void performReferralOperations() {
         List<Row> rows = query(new QueryStatement<List<Row>>("SELECT server_uuid,sequence_value,record_json FROM " + ReferralTables.EVENTS) {
             @Override public void prepare(PreparedStatement statement) { }
             @Override public List<Row> processResults(ResultSet results) throws SQLException {

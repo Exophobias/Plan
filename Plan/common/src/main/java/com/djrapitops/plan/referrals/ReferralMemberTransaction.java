@@ -11,7 +11,7 @@ public final class ReferralMemberTransaction extends ReferralTables.Tx {
         this.server = server.toString(); this.player = player.toString(); this.firstJoin = firstJoin;
         this.gate = ReferralCapture.state();
     }
-    @Override protected void performOperations() {
+    @Override protected void performReferralOperations() {
         if (gate.paused() || firstJoin < gate.changedAt() || ReferralCapture.state().generation() != gate.generation()
                 || deleted(player)) return;
         Long existing = one("SELECT first_join FROM " + ReferralTables.MEMBERS + " WHERE server_uuid=? AND uuid=?",

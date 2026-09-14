@@ -38,6 +38,21 @@ public final class ReferralTables {
     }
 
     public abstract static class Tx extends Transaction {
+        @Override protected final void performOperations() {
+            try {
+                performReferralOperations();
+            } catch (RuntimeException failure) {
+                // The shared SQLite connection is reused; unchecked validation/cancellation failures
+                // must not leave writes for the next transaction to accidentally commit.
+                execute(connection -> {
+                    try { connection.rollback(); }
+                    catch (SQLException rollbackFailure) { failure.addSuppressed(rollbackFailure); }
+                    return true;
+                });
+                throw failure;
+            }
+        }
+        protected abstract void performReferralOperations();
         public <T> List<T> rows(String sql, Extractor<T> extractor, Object... args) {
             return query(new QueryStatement<List<T>>(sql) {
                 @Override public void prepare(PreparedStatement statement) throws SQLException { bind(statement, args); }

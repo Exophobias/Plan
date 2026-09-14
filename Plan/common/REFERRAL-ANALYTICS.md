@@ -28,6 +28,9 @@ moderation reasons. Responses are private and cannot be statically exported.
   24-hour periods containing at least five minutes of non-AFK activity.
 - The funnel counts all recorded claims, including historical records, independently from the
   prospective activity cohort. Acceptance and qualification timestamps mean website processing.
+  Median qualification hours measure request-to-qualification processing time among observed,
+  nonlegacy completed claims; pending/rejected claims and unknown legacy timing do not enter its
+  explicit sample. A zero sample has a null median.
 - Credit obligation amounts and currencies are immutable; delivered amounts require website
   delivery proof. Totals are kept separately by currency. Per-retained-player numerators use the
   same W1-eligible acquired cohort, with an explicitly shared all-acquired denominator for each
@@ -62,7 +65,9 @@ The journal uses a persistent stream identity and exact contiguous cursor compar
 latest projection validates only touched entities; empty heartbeats do not scan history. Immutable
 claim identity, first acceptance/qualification, terminal states and award facts cannot be rewritten.
 Every new persistence boundary checks `Transaction.wasSuccessful()` because Plan's database futures
-can otherwise complete normally after logging a transaction failure.
+can otherwise complete normally after logging a transaction failure. Unchecked failures explicitly
+roll back partial writes before a shared SQLite connection can be reused. Entity identity checks
+also reject case aliases under case-insensitive MySQL collations.
 
 Reports are precomputed on a dedicated background executor. Requests only read a cached generation
 and perform a small server-existence check. Feed freshness allows ten minutes for the five-minute

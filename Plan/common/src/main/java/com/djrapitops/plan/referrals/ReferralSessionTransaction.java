@@ -16,7 +16,7 @@ public final class ReferralSessionTransaction extends ReferralTables.Tx {
     public ReferralSessionTransaction(UUID server, UUID player, long start, long end, ReferralActivity.Snapshot snapshot) {
         this.server = server.toString(); this.player = player.toString(); this.start = start; this.end = end; this.snapshot = snapshot;
     }
-    @Override protected void performOperations() {
+    @Override protected void performReferralOperations() {
         if (snapshot == null || deleted(player)) return;
         Long joined = one("SELECT first_join FROM " + ReferralTables.MEMBERS + " WHERE server_uuid=? AND uuid=?", r -> r.getLong(1), null, server, player);
         if (joined == null || start >= joined + 35 * ReferralReport.DAY) return;

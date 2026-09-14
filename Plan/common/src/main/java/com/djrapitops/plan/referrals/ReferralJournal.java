@@ -61,7 +61,7 @@ public final class ReferralJournal {
             validate(batch, received);
             this.server = server.toString(); this.batch = batch; this.received = received;
         }
-        @Override protected void performOperations() {
+        @Override protected void performReferralOperations() {
             Checkpoint previous = one("SELECT stream_id,cursor_value FROM " + ReferralTables.FEED + " WHERE server_uuid=?" + lockForUpdate(),
                     r -> new Checkpoint(r.getString(1), r.getLong(2)), new Checkpoint(null, 0), server);
             require(previous.streamId == null || previous.streamId.equals(batch.streamId), "Referral stream changed; continuity review required");
@@ -128,7 +128,10 @@ public final class ReferralJournal {
             else sql("UPDATE " + ReferralTables.FEED + " SET cursor_value=?,source_as_of=?,received_at=? WHERE server_uuid=?", batch.throughInclusive, sourceThrough, received, server);
         }
         private Event latest(String key) {
-            return one("SELECT record_json FROM " + ReferralTables.LATEST + " WHERE server_uuid=? AND entity_key=?", r -> JSON.fromJson(r.getString(1),Event.class),null,server,key);
+            Event existing = one("SELECT record_json FROM " + ReferralTables.LATEST + " WHERE server_uuid=? AND entity_key=?", r -> JSON.fromJson(r.getString(1),Event.class),null,server,key);
+            require(existing == null || key.equals(existing.claim != null ? "c:" + existing.claim.claimId : "a:" + existing.award.awardId),
+                    "Entity identifier changed under database collation");
+            return existing;
         }
     }
 }

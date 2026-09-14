@@ -25,6 +25,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
     private volatile boolean enabled;
     private volatile String runId;
     private volatile long runGeneration = -1, runStart, previousFlush;
+    private volatile CommittedRun committedRun;
     private volatile boolean failed;
     private static final long PROCESS_START = ProcessHandle.current().info().startInstant().map(java.time.Instant::toEpochMilli).orElse(0L);
     private static final String PROCESS_TOKEN = ProcessHandle.current().pid() + ":" + PROCESS_START;
@@ -52,8 +53,9 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
     }
     @Override public CompletionStage<Void> prepareServerShutdown() {
         long now = System.currentTimeMillis(); ReferralCapture.State gate = ReferralCapture.state();
-        if (gate.paused() || failed || runGeneration != gate.generation() || previousFlush <= 0
-                || now < previousFlush || now - previousFlush > 90000 || PROCESS_START == 0) {
+        CommittedRun durable = committedRun;
+        if (gate.paused() || failed || durable == null || durable.generation != gate.generation() || durable.flushed <= 0
+                || now < durable.flushed || now - durable.flushed > 90000 || PROCESS_START == 0) {
             return CompletableFuture.failedFuture(new IllegalStateException("Clean activity stop could not be proven"));
         }
         long threshold = config.get(TimeSettings.AFK_THRESHOLD);
@@ -63,7 +65,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
         if (ReferralCapture.state().generation() != gate.generation())
             return CompletableFuture.failedFuture(new IllegalStateException("Activity collection changed during stop"));
         setCollectionPaused(true);
-        String id = runId, server = serverInfo.getServerUUID().toString();
+        String id = durable.id, server = serverInfo.getServerUUID().toString();
         long stopGeneration = ReferralCapture.state().generation();
         CompletableFuture<Void> completion = new CompletableFuture<>();
         ReferralTables.commit(database(), new ReferralTables.Tx() {
@@ -73,7 +75,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
                         || ReferralCapture.state().generation() != stopGeneration || !ReferralCapture.state().paused())
                     throw new IllegalStateException("Clean stop proof expired or collection changed");
             }
-            @Override protected void performOperations() {
+            @Override protected void performReferralOperations() {
                 check();
                 if (!one("SELECT run_id FROM " + ReferralTables.COVERAGE + " WHERE run_id=?",r -> true,false,id))
                     throw new IllegalStateException("Clean stop coverage was not persisted");
@@ -115,7 +117,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
         try { cache.put(server, new Cached(now, ReferralReport.load(database(), server, now, failed))); }
         catch (RuntimeException failure) { cache.put(server, new Cached(now, empty(server, now))); }
     }
-    void collect(long now) {
+    synchronized void collect(long now) {
         ReferralCapture.State gate = ReferralCapture.state();
         if (gate.paused()) { runGeneration = -1; return; }
         long afkThreshold = config.get(TimeSettings.AFK_THRESHOLD);
@@ -135,7 +137,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
         if (ReferralCapture.state().generation() != gate.generation()) { runGeneration = -1; return; }
         String id = runId, server = serverInfo.getServerUUID().toString(); long start = runStart;
         ReferralTables.commit(database(), new ReferralTables.Tx() {
-            @Override protected void performOperations() {
+            @Override protected void performReferralOperations() {
                 if (ReferralCapture.state().generation() != gate.generation()) return;
                 Stop stop = one("SELECT process_token,stopped_at FROM " + ReferralTables.STOPS + " WHERE server_uuid=?",
                         r -> new Stop(r.getString(1),r.getLong(2)),null,server);
@@ -151,9 +153,12 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
                 else sql("INSERT INTO " + ReferralTables.COVERAGE + " (run_id,server_uuid,start_ms,end_ms,flushed_at) VALUES (?,?,?,?,?)", id, server, start, through, now);
             }
         }).join();
-        previousFlush = now;
+        if (ReferralCapture.state().generation() == gate.generation()) {
+            previousFlush = now;
+            committedRun = new CommittedRun(id, gate.generation(), now);
+        }
     }
-    public synchronized Map<String, Object> report(UUID server) {
+    public Map<String, Object> report(UUID server) {
         if (database().query(com.djrapitops.plan.storage.database.queries.objects.ServerQueries.fetchServerId(
                 com.djrapitops.plan.identification.ServerUUID.from(server))).isEmpty()) throw new IllegalArgumentException("Unknown server");
         Cached found = cache.get(server); long now = System.currentTimeMillis();
@@ -164,6 +169,7 @@ public class ReferralAnalyticsSvc implements ReferralAnalyticsService, SubSystem
         return ReferralReport.calculate(server, now, List.of(), List.of(), List.of(), List.of(), new ReferralReport.Feed(0,0,0),0,true);
     }
     private record Cached(long at, Map<String, Object> report) { }
+    private record CommittedRun(String id, long generation, long flushed) { }
     private record Stop(String process, long at) { }
     static boolean validDowntime(String priorProcess,long stoppedAt,String currentProcess,long processStart,long resumedAt) {
         return !priorProcess.equals(currentProcess) && stoppedAt > 0 && processStart > stoppedAt && resumedAt >= processStart;

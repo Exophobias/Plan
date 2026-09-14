@@ -112,4 +112,20 @@ class ReferralReportTest {
         assertEquals("recorded_referral",attribution(new Member(PLAYER.toString(),JOIN),claim(JOIN-1000),
                 new Feed(JOIN+2*DAY,JOIN-DAY,JOIN+2*DAY),JOIN+2*DAY));
     }
+    @Test void qualificationMedianUsesOnlyObservedCompletedClaimsAndNullForNoSample() {
+        List<Event> events = new ArrayList<>();
+        String[] states = {"successful","successful","pending","rejected","successful"};
+        long[] hours = {2,6,0,0,100};
+        for (int i=0;i<states.length;i++) {
+            long qualified = hours[i] == 0 ? 0 : JOIN + hours[i]*3600000;
+            Claim c = new Claim(String.valueOf(i).repeat(32),UUID.randomUUID(),states[i],JOIN,JOIN,qualified,0,i!=4,i==4,false);
+            events.add(new Event(i+1,JOIN+10*DAY,c,null));
+        }
+        @SuppressWarnings("unchecked") Map<String,Object> funnel = (Map<String,Object>) report(10,List.of(),List.of(new Span(JOIN,JOIN+10*DAY)),events).get("funnel");
+        assertEquals(5,funnel.get("requested")); assertEquals(3L,funnel.get("qualified"));
+        assertEquals(1L,funnel.get("pending")); assertEquals(1L,funnel.get("rejected"));
+        assertEquals(2,funnel.get("qualification_sample")); assertEquals(4.0,funnel.get("median_qualification_hours"));
+        @SuppressWarnings("unchecked") Map<String,Object> empty = (Map<String,Object>) report(10,List.of(),List.of(),List.of()).get("funnel");
+        assertEquals(0,empty.get("qualification_sample")); assertNull(empty.get("median_qualification_hours"));
+    }
 }

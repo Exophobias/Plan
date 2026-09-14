@@ -24,7 +24,7 @@ public final class ReferralReport {
     static Map<String, Object> load(Database db, UUID server, long now, boolean failed) {
         java.util.concurrent.atomic.AtomicReference<Data> output = new java.util.concurrent.atomic.AtomicReference<>();
         ReferralTables.commit(db, new ReferralTables.Tx() {
-            @Override protected void performOperations() { output.set(loadSnapshot(this, server, now, failed)); }
+            @Override protected void performReferralOperations() { output.set(loadSnapshot(this, server, now, failed)); }
         }).join();
         Data data = output.get();
         return calculate(server, now, data.members, data.sessions, data.coverage, data.events, data.feed, data.flush, failed);
@@ -91,6 +91,11 @@ public final class ReferralReport {
                 "qualified", claims.values().stream().filter(c -> c.qualifiedAt > 0).count(), "rewarded", delivered.size());
         for (String state : List.of("verifying", "pending", "rejected", "expired"))
             funnel.put(state, claims.values().stream().filter(c -> state.equals(c.status)).count());
+        List<Double> qualificationHours = claims.values().stream()
+                .filter(c -> !c.legacy && c.requestedAt > 0 && c.qualifiedAt > 0 && c.qualifiedAt >= c.requestedAt)
+                .map(c -> (c.qualifiedAt - c.requestedAt) / 3600000.0).collect(Collectors.toList());
+        funnel.put("qualification_sample", qualificationHours.size());
+        funnel.put("median_qualification_hours", median(qualificationHours));
         List<Player> referred = players.stream().filter(p -> "recorded_referral".equals(p.group)).collect(Collectors.toList());
         List<Player> eligible = referred.stream().filter(p -> p.complete(7,14)).collect(Collectors.toList());
         Set<String> eligibleClaims = eligible.stream().map(p -> p.claim.claimId).collect(Collectors.toSet());

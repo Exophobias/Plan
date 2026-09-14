@@ -140,4 +140,36 @@ public interface ReferralDatabaseTest extends DatabaseTestPreparer {
         String intervals = db().queryOptional("SELECT intervals FROM " + ReferralTables.ACTIVITY,r -> r.getString(1)).orElseThrow();
         assertTrue(intervals.contains("2000")); assertFalse(intervals.contains("3000"));
     }
+    @Test default void referralUncheckedFailureRollsBackBeforeTheConnectionIsReused() {
+        var failed = new ReferralTables.Tx() {
+            @Override protected void performReferralOperations() {
+                sql("INSERT INTO " + ReferralTables.MEMBERS + " (server_uuid,uuid,first_join) VALUES (?,?,?)",
+                        serverUUID().toString(),playerUUID.toString(),1000);
+                throw new IllegalStateException("Injected cancellation after first write");
+            }
+        };
+        utilities.TestErrorLogger.throwErrors(false);
+        try { assertThrows(RuntimeException.class,() -> ReferralTables.commit(db(),failed).join()); }
+        finally { utilities.TestErrorLogger.throwErrors(true); }
+        db().executeInTransaction("INSERT INTO " + ReferralTables.MEMBERS + " (server_uuid,uuid,first_join) VALUES (?,?,?)",
+                serverUUID().toString(),player2UUID.toString(),2000).join();
+        assertEquals(1,count(ReferralTables.MEMBERS));
+        assertEquals(player2UUID.toString(),db().queryOptional("SELECT uuid FROM " + ReferralTables.MEMBERS,r -> r.getString(1)).orElseThrow());
+    }
+    @Test default void referralCollationCannotAliasImmutableAwardIdentity() {
+        Award first = new Award("credit",CLAIM,"credit","CAD",500,3000,4000,3500,"delivered");
+        apply(page(0,2,2,List.of(new Event(1,2000,referralClaim(),null),new Event(2,4000,null,first))));
+        // MySQL general_ci naturally matches this alias; reproduce that lookup on SQLite too.
+        if (db().getType() != com.djrapitops.plan.storage.database.DBType.MYSQL)
+            db().executeInTransaction("UPDATE " + ReferralTables.LATEST + " SET entity_key=? WHERE entity_key=?","a:CREDIT","a:credit").join();
+        Award alias = new Award("CREDIT",CLAIM,"credit","CAD",999,3000,4000,3500,"delivered");
+        rejected(page(2,3,3,List.of(new Event(3,4500,null,alias))));
+        if (db().getType() == com.djrapitops.plan.storage.database.DBType.MYSQL) {
+            Award next = new Award("next",CLAIM,"credit","CAD",500,3000,4000,3500,"delivered");
+            Award nextAlias = new Award("NEXT",CLAIM,"credit","CAD",999,3000,4000,3500,"delivered");
+            rejected(page(2,4,4,List.of(new Event(3,4500,null,next),new Event(4,4500,null,nextAlias))));
+        }
+        assertEquals(2,count(ReferralTables.EVENTS));
+        assertEquals(2L,db().queryOptional("SELECT cursor_value FROM " + ReferralTables.FEED,r -> r.getLong(1)).orElseThrow());
+    }
 }

@@ -51,6 +51,7 @@ const ServerJoinAddresses = React.lazy(() => import("./views/server/ServerJoinAd
 const ServerPlayerRetention = React.lazy(() => import("./views/server/ServerPlayerRetention"));
 const ServerReferrals = React.lazy(() => import("./views/server/ServerReferrals"));
 const ServerStore = React.lazy(() => import("./views/server/ServerStore"));
+const ServerReports = React.lazy(() => import("./views/server/ServerReports"));
 
 const NetworkPage = React.lazy(() => import("./views/layout/NetworkPage"));
 const NetworkOverview = React.lazy(() => import("./views/network/NetworkOverview"));
@@ -177,6 +178,7 @@ const router = createBrowserRouter(
                 <Route path="retention" element={<Lazy><ServerPlayerRetention/></Lazy>}/>
                 {!staticSite && <Route path="referrals" element={<Lazy><ServerReferrals/></Lazy>}/>}
                 {!staticSite && <Route path="store" element={<Lazy><ServerStore/></Lazy>}/>}
+                {!staticSite && <Route path="reports" element={<Lazy><ServerReports/></Lazy>}/>}
                 <Route path="players" element={<Lazy><ServerPlayers/></Lazy>}/>
                 <Route path="geolocations" element={<Lazy><ServerGeolocations/></Lazy>}/>
                 <Route path="performance" element={<Lazy><ServerPerformance/></Lazy>}/>

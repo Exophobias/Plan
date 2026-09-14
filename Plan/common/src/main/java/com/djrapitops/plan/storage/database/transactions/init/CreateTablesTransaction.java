@@ -31,6 +31,11 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
 
     public static String[] tableNames() {
         return new String[]{
+                com.djrapitops.plan.community.CommunityTables.MEMBERS,
+                com.djrapitops.plan.community.CommunityTables.ACTIVITY,
+                com.djrapitops.plan.community.CommunityTables.COVERAGE,
+                com.djrapitops.plan.community.CommunityTables.DELETED,
+                com.djrapitops.plan.community.CommunityTables.STOPS,
                 com.djrapitops.plan.store.StoreTables.FEED,
                 com.djrapitops.plan.store.StoreTables.EVENTS,
                 com.djrapitops.plan.store.StoreTables.LATEST,
@@ -72,6 +77,7 @@ public class CreateTablesTransaction extends OperationCriticalTransaction {
 
     @Override
     protected void performOperations() {
+        com.djrapitops.plan.community.CommunityTables.createStatements().forEach(this::execute);
         com.djrapitops.plan.store.StoreTables.createStatements().forEach(this::execute);
         com.djrapitops.plan.referrals.ReferralTables.createStatements().forEach(this::execute);
         // DBType is required for SQL creation, as MySQL and SQLite primary key format differs.

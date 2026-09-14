@@ -96,6 +96,7 @@ public class RootJSONResolver {
             RetentionJSONResolver retentionJSONResolver,
             ReferralsJSONResolver referralsJSONResolver,
             StoreJSONResolver storeJSONResolver,
+            CommunityReportJSONResolver communityReportJSONResolver,
             PlayerJoinAddressJSONResolver playerJoinAddressJSONResolver,
             PluginHistoryJSONResolver pluginHistoryJSONResolver,
             AllowlistJSONResolver allowlistJSONResolver,
@@ -148,6 +149,7 @@ public class RootJSONResolver {
                 .add("retention", retentionJSONResolver)
                 .add("referrals", referralsJSONResolver)
                 .add("store", storeJSONResolver)
+                .add("community-report", communityReportJSONResolver)
                 .add("joinAddresses", playerJoinAddressJSONResolver)
                 .add("preferences", preferencesJSONResolver)
                 .add("gameAllowlistBounces", allowlistJSONResolver)

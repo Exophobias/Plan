@@ -28,6 +28,7 @@ import com.djrapitops.plan.storage.database.transactions.patches.AfterBadJoinAdd
 import com.djrapitops.plan.storage.database.transactions.patches.BadJoinAddressDataCorrectionPatchTest;
 
 public interface DatabaseTestAggregate extends
+        com.djrapitops.plan.community.CommunityDatabaseTest,
         com.djrapitops.plan.referrals.ReferralDatabaseTest,
         com.djrapitops.plan.store.StoreDatabaseTest,
         ActivityIndexQueriesTest,

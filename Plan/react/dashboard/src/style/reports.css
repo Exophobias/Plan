@@ -1,0 +1,20 @@
+.reports-page { min-width: 0; padding-bottom: 1rem; }
+#content-wrapper:has(.reports-page) { min-width: 0; }
+.reports-controls, .reports-downloads { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; }
+.reports-controls > div { flex: 1 1 11rem; min-width: 0; }
+.reports-controls input, .reports-controls select { max-width: 100%; }
+.reports-controls button { min-height: 38px; }
+.reports-sections { display: flex; flex-wrap: wrap; gap: .8rem 2rem; }
+.reports-sections legend { float: none; width: 100%; }
+.reports-previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 1.5rem; }
+.reports-previews figure { min-width: 0; margin: 0; max-width: 640px; }
+.reports-previews img { display: block; width: 100%; height: auto; border: 1px solid #596574; }
+.reports-previews figcaption { flex-wrap: wrap; font-size: .9rem; }
+.reports-public-text { white-space: pre-wrap; overflow-wrap: anywhere; color: inherit; font-family: inherit; }
+.reports-private { padding: 1rem; border: 1px solid #7a8491; border-radius: .3rem; }
+.reports-page summary { cursor: pointer; }
+.reports-page :is(a, button, summary, input, select):focus-visible { outline: 3px solid #b8974d; outline-offset: 3px; }
+@media (max-width: 575px) {
+    .reports-controls > div, .reports-controls > button { flex-basis: 100%; }
+    .reports-downloads > a { width: 100%; }
+}

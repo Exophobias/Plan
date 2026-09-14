@@ -124,12 +124,16 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
 
         final com.djrapitops.plan.store.StoreTransfer.Snapshot store;
         final ReferralTransfer.Snapshot referrals;
+        final com.djrapitops.plan.community.CommunityTransfer.Snapshot community;
         try {
             store = com.djrapitops.plan.store.StoreTransfer.capture(fromDB);
             com.djrapitops.plan.store.StoreTransfer.preflight(toDB,store,strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
                     strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
             referrals = ReferralTransfer.capture(fromDB);
             ReferralTransfer.preflight(toDB, referrals, strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
+                    strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
+            community = com.djrapitops.plan.community.CommunityTransfer.capture(fromDB);
+            com.djrapitops.plan.community.CommunityTransfer.preflight(toDB, community, strategies.contains(Strategy.CLEAR_DESTINATION_DATABASE),
                     strategies.contains(Strategy.SERVER_UUID_CONFLICT_SWAP_UUID) || strategies.contains(Strategy.SERVER_UUID_CONFLICT_DELETE_SERVER));
         } catch (RuntimeException refusal) {
             feedback.accept("Analytics transfer refused before destination changes. Use a full replacement or native database backup.");
@@ -175,6 +179,7 @@ public class DatabaseCopyProcessor implements CriticalRunnable {
             LookupTable<Integer> statisticsIdLookupTable = copyStatistics();
             copyStatisticValues(statisticsIdLookupTable, userIdLookupTable, serverIdLookupTable);
             ReferralTransfer.restore(toDB, referrals);
+            com.djrapitops.plan.community.CommunityTransfer.restore(toDB, community);
             com.djrapitops.plan.store.StoreTransfer.restore(toDB,store);
             // TODO plan how to copy extension data https://github.com/plan-player-analytics/Plan/wiki/Database-Schema
 

@@ -57,6 +57,7 @@ public class RemovePlayerTransaction extends ThrowawayTransaction {
     @Override
     protected void performOperations() {
         if (!preserveReferralCohort) executeOther(new com.djrapitops.plan.referrals.ReferralEraseTransaction(playerUUID));
+        if (!preserveReferralCohort) executeOther(new com.djrapitops.plan.community.CommunityEraseTransaction(playerUUID));
         query(PlayerFetchQueries.playerUserName(playerUUID)).ifPresent(this::deleteWebUser);
 
         deleteFromUserIdTable(GeoInfoTable.TABLE_NAME);

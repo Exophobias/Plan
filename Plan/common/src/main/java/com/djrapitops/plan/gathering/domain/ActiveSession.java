@@ -46,6 +46,8 @@ public class ActiveSession {
         extraData.put(PlayerKills.class, new PlayerKills());
         extraData.put(com.djrapitops.plan.referrals.ReferralActivity.class,
                 new com.djrapitops.plan.referrals.ReferralActivity(start));
+        extraData.put(com.djrapitops.plan.community.CommunityActivity.class,
+                new com.djrapitops.plan.community.CommunityActivity(start));
 
         lastMovementForAfkCalculation = start;
     }
@@ -157,6 +159,8 @@ public class ActiveSession {
 
     public synchronized void recordReferralActivity(long end, boolean active) {
         extraData.get(com.djrapitops.plan.referrals.ReferralActivity.class)
+                .ifPresent(activity -> activity.classified(end, active));
+        extraData.get(com.djrapitops.plan.community.CommunityActivity.class)
                 .ifPresent(activity -> activity.classified(end, active));
     }
 

@@ -59,6 +59,7 @@ public class StoreSessionTransaction extends Transaction {
         storeJoinAddressIfPresent();
         execute(DataStoreQueries.storeSession(session));
         executeOther(new com.djrapitops.plan.referrals.ReferralSessionTransaction(session));
+        executeOther(new com.djrapitops.plan.community.CommunitySessionTransaction(session));
     }
 
     private void storeJoinAddressIfPresent() {

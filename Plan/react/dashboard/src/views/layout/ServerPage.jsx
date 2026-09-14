@@ -16,6 +16,7 @@ import {
     faLocationArrow,
     faSearch,
     faSignsPost,
+    faStore,
     faUserGroup,
     faUsers,
     faUsersViewfinder
@@ -35,6 +36,7 @@ import {ServerExtensionContextProvider, useServerExtensionContext} from "../../h
 import {iconTypeToFontAwesomeClass} from "../../util/icons.ts";
 import {staticSite} from "../../service/backendConfiguration";
 import {canViewReferrals} from "../../util/referralAnalytics.js";
+import {canViewStore} from "../../util/storeAnalytics.js";
 
 const HelpModal = React.lazy(() => import("../../components/modal/HelpModal"));
 
@@ -43,6 +45,7 @@ const ServerSidebar = () => {
     const auth = useAuth();
     const {authRequired} = auth;
     const seeReferrals = canViewReferrals(auth, staticSite);
+    const seeStore = canViewStore(auth, staticSite);
     const {sidebarItems, setSidebarItems} = useNavigation();
     const {extensionData} = useServerExtensionContext();
 
@@ -137,6 +140,7 @@ const ServerSidebar = () => {
                 ]
             },
             {name: 'html.label.performance', icon: faCogs, href: "performance", permission: 'page.server.performance'},
+            ...(seeStore ? [{name: 'Store', icon: faStore, href: 'store', permission: 'page.server.store'}] : []),
             {},
             {name: 'html.label.plugins', permission: 'page.server.plugins'},
             {
@@ -180,7 +184,7 @@ const ServerSidebar = () => {
             .filter(item => !item.authRequired || (authRequired && item.authRequired))
         setSidebarItems(items);
         window.document.title = `Plan | Server Analysis`;
-    }, [t, i18n, extensionData, setSidebarItems, authRequired, seeReferrals])
+    }, [t, i18n, extensionData, setSidebarItems, authRequired, seeReferrals, seeStore])
 
     return (
         <Sidebar items={sidebarItems}/>

@@ -101,7 +101,7 @@ public class PlayerLeaveEventConsumer {
     }
 
     public void onLeaveProxyServer(PlayerLeave leave) {
-        endSession(leave);
+        endSession(leave).ifPresent(SessionCache::activityStored);
         updateExport(leave);
         cleanFromCache(leave);
     }
@@ -111,7 +111,8 @@ public class PlayerLeaveEventConsumer {
     }
 
     private void storeFinishedSession(FinishedSession finishedSession) {
-        dbSystem.getDatabase().executeTransaction(new StoreSessionTransaction(finishedSession));
+        dbSystem.getDatabase().executeTransaction(new StoreSessionTransaction(finishedSession))
+                .thenRun(() -> SessionCache.activityStored(finishedSession));
     }
 
     private void storeBanStatus(PlayerLeave leave) {

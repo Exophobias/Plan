@@ -54,6 +54,22 @@ public class CommonQueriesImplementation implements CommonQueries {
     }
 
     @Override
+    public ActivePlaytimeSnapshot fetchActivePlaytimeSnapshot(UUID playerUUID, UUID serverUUID) {
+        java.util.Objects.requireNonNull(playerUUID, "playerUUID");
+        ServerUUID server = ServerUUID.from(java.util.Objects.requireNonNull(serverUUID, "serverUUID"));
+        for (int attempt = 0; attempt < 3; attempt++) {
+            var memory = SessionCache.activityMemory(playerUUID, server, System.currentTimeMillis());
+            long completed = db.query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                    .completed(playerUUID, server, memory.observedAt(), memory.sessions().keySet()));
+            if (!SessionCache.activityUnchanged(playerUUID, memory)) continue;
+            long total = completed;
+            for (long active : memory.sessions().values()) total = Math.addExact(total, active);
+            return new ActivePlaytimeSnapshot(total, memory.observedAt(), memory.online());
+        }
+        throw new IllegalStateException("Player sessions changed during the activity observation; retry");
+    }
+
+    @Override
     public long fetchCurrentSessionPlaytime(UUID playerUUID) {
         return SessionCache.getCachedSession(playerUUID)
                 .map(ActiveSession::toFinishedSessionFromStillActive)

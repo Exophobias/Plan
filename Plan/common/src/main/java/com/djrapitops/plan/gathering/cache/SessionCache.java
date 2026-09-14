@@ -33,6 +33,53 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SessionCache {
 
     private static final Map<UUID, ActiveSession> ACTIVE_SESSIONS = new ConcurrentHashMap<>();
+    private static final Object ACTIVITY_LOCK = new Object();
+    private static final Map<UUID, List<FinishedSession>> AWAITING_STORAGE = new HashMap<>();
+    private static final Map<UUID, Long> ACTIVITY_VERSIONS = new HashMap<>();
+    private static long activitySequence;
+
+    private static void activityChanged(UUID player) {
+        ACTIVITY_VERSIONS.put(player, ++activitySequence);
+    }
+
+    /** Captures memory sessions before a database query; callers must recheck the version. */
+    public static ActivityMemory activityMemory(UUID player, com.djrapitops.plan.identification.ServerUUID server, long now) {
+        synchronized (ACTIVITY_LOCK) {
+            Map<Long, Long> sessions = new HashMap<>();
+            for (FinishedSession pending : AWAITING_STORAGE.getOrDefault(player, List.of())) {
+                if (pending.getServerUUID().equals(server)) {
+                    if (pending.getLength() < 0 || pending.getAfkTime() < 0 || pending.getActiveTime() < 0
+                            || pending.getEnd() > now) throw new IllegalStateException("Invalid pending activity");
+                    sessions.merge(pending.getStart(), pending.getActiveTime(), Math::max);
+                }
+            }
+            ActiveSession active = ACTIVE_SESSIONS.get(player);
+            boolean online = active != null && active.getServerUUID().equals(server);
+            if (online) sessions.merge(active.getStart(), active.confirmedActiveTime(now), Math::max);
+            return new ActivityMemory(ACTIVITY_VERSIONS.getOrDefault(player, 0L),
+                    Map.copyOf(sessions), online, now);
+        }
+    }
+
+    public static boolean activityUnchanged(UUID player, ActivityMemory snapshot) {
+        synchronized (ACTIVITY_LOCK) {
+            return ACTIVITY_VERSIONS.getOrDefault(player, 0L) == snapshot.version();
+        }
+    }
+
+    /** Called only after the storage future commits successfully. Failed writes stay represented. */
+    public static void activityStored(FinishedSession stored) {
+        synchronized (ACTIVITY_LOCK) {
+            List<FinishedSession> pending = AWAITING_STORAGE.get(stored.getPlayerUUID());
+            if (pending != null && pending.removeIf(session -> session.getStart() == stored.getStart()
+                    && session.getEnd() == stored.getEnd() && session.getServerUUID().equals(stored.getServerUUID()))) {
+                if (pending.isEmpty()) AWAITING_STORAGE.remove(stored.getPlayerUUID());
+                activityChanged(stored.getPlayerUUID());
+            }
+        }
+    }
+
+    public record ActivityMemory(long version, Map<Long, Long> sessions, boolean online, long observedAt) { }
 
     @Inject
     public SessionCache() {
@@ -45,7 +92,13 @@ public class SessionCache {
     }
 
     public static void clear() {
-        ACTIVE_SESSIONS.clear();
+        synchronized (ACTIVITY_LOCK) {
+            Set<UUID> players = new HashSet<>(ACTIVE_SESSIONS.keySet());
+            players.addAll(AWAITING_STORAGE.keySet());
+            players.forEach(SessionCache::activityChanged);
+            ACTIVE_SESSIONS.clear();
+            AWAITING_STORAGE.clear();
+        }
     }
 
     public static void refreshActiveSessionsState() {
@@ -72,13 +125,16 @@ public class SessionCache {
      * @return Optional: previous session. Recipients of this object should decide if it needs to be saved.
      */
     public Optional<FinishedSession> cacheSession(UUID playerUUID, ActiveSession newSession) {
-        Optional<ActiveSession> inProgress = getCachedSession(playerUUID);
-        Optional<FinishedSession> finished = Optional.empty();
-        if (inProgress.isPresent()) {
-            finished = endSession(playerUUID, newSession.getStart(), inProgress.get());
+        synchronized (ACTIVITY_LOCK) {
+            Optional<ActiveSession> inProgress = getCachedSession(playerUUID);
+            Optional<FinishedSession> finished = Optional.empty();
+            if (inProgress.isPresent()) {
+                finished = endSession(playerUUID, newSession.getStart(), inProgress.get());
+            }
+            ACTIVE_SESSIONS.put(playerUUID, newSession);
+            activityChanged(playerUUID);
+            return finished;
         }
-        ACTIVE_SESSIONS.put(playerUUID, newSession);
-        return finished;
     }
 
     /**
@@ -90,17 +146,24 @@ public class SessionCache {
      * @return Optional: ended session. Recipients of this object should decide if it needs to be saved.
      */
     public Optional<FinishedSession> endSession(UUID playerUUID, long time, ActiveSession activeSession) {
-        if (activeSession == null) {
-            return Optional.empty();
+        synchronized (ACTIVITY_LOCK) {
+            if (activeSession == null || ACTIVE_SESSIONS.get(playerUUID) != activeSession) {
+                return Optional.empty();
+            }
+            ACTIVE_SESSIONS.remove(playerUUID);
+            activityChanged(playerUUID);
+            if (activeSession.getStart() > time) {
+                return Optional.empty();
+            }
+            FinishedSession finished = activeSession.toFinishedSession(time);
+            AWAITING_STORAGE.computeIfAbsent(playerUUID, ignored -> new ArrayList<>()).add(finished);
+            return Optional.of(finished);
         }
-        ACTIVE_SESSIONS.remove(playerUUID);
-        if (activeSession.getStart() > time) {
-            return Optional.empty();
-        }
-        return Optional.of(activeSession.toFinishedSession(time));
     }
 
     public Optional<FinishedSession> endSession(UUID playerUUID, long time) {
-        return endSession(playerUUID, time, ACTIVE_SESSIONS.get(playerUUID));
+        synchronized (ACTIVITY_LOCK) {
+            return endSession(playerUUID, time, ACTIVE_SESSIONS.get(playerUUID));
+        }
     }
 }

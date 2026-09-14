@@ -56,6 +56,27 @@ import static org.junit.jupiter.api.Assertions.*;
 public interface SessionQueriesTest extends DatabaseTestPreparer {
 
     @Test
+    default void confirmedActivityExcludesAfkOtherPlayersAndMemoryOwnedSessions() {
+        prepareForSessionSave();
+        FinishedSession first = new FinishedSession(playerUUID, serverUUID(), 1000, 11000, 3000, new DataMap());
+        FinishedSession second = new FinishedSession(playerUUID, serverUUID(), 20000, 25000, 1000, new DataMap());
+        FinishedSession other = new FinishedSession(player2UUID, serverUUID(), 1000, 11000, 0, new DataMap());
+        db().executeTransaction(new StoreSessionTransaction(first));
+        db().executeTransaction(new StoreSessionTransaction(second));
+        db().executeTransaction(new StoreSessionTransaction(other));
+        assertEquals(11000L, db().query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                .completed(playerUUID, serverUUID(), 30000, Set.of())));
+        assertEquals(7000L, db().query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                .completed(playerUUID, serverUUID(), 30000, Set.of(20000L))));
+        assertEquals(7000L, db().query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                .completed(playerUUID, serverUUID(), 12000, Set.of())));
+        assertEquals(0L, db().query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                .completed(UUID.randomUUID(), serverUUID(), 30000, Set.of())));
+        assertEquals(0L, db().query(com.djrapitops.plan.storage.database.queries.objects.ConfirmedActivityQuery
+                .completed(playerUUID, ServerUUID.from(UUID.randomUUID()), 30000, Set.of())));
+    }
+
+    @Test
     default void sessionStoreTransactionOutOfOrderDoesNotFailDueToMissingMainUser() {
         db().executeTransaction(new StoreWorldNameTransaction(serverUUID(), worlds[0]));
         db().executeTransaction(new StoreWorldNameTransaction(serverUUID(), worlds[1]));

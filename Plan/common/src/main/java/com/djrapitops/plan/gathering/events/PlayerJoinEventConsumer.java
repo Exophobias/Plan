@@ -200,7 +200,8 @@ public class PlayerJoinEventConsumer {
     }
 
     private void storeInterruptedSession(FinishedSession finishedSession) {
-        dbSystem.getDatabase().executeTransaction(new StoreSessionTransaction(finishedSession));
+        dbSystem.getDatabase().executeTransaction(new StoreSessionTransaction(finishedSession))
+                .thenRun(() -> SessionCache.activityStored(finishedSession));
     }
 
     private ActiveSession mapToActiveSession(PlayerJoin join) {

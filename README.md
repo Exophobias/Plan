@@ -14,6 +14,14 @@ Player Analytics is a fully-fledged solution for the analytics needs of your Min
 
 Plan supports multiple different platforms and versions; Spigot, Paper, Fabric, Sponge, SpongeForge, Bungeecord, Velocity, Folia & all derivatives - One jar for all platforms.
 
+This Patriam fork's public API `5.9-R0.1-patriam.2` adds
+`CommonQueries.fetchActivePlaytimeSnapshot(playerUUID, serverUUID)` for trusted reward eligibility.
+It counts completed, pending-storage and online sessions once, subtracts AFK time, and withholds
+the current idle gap until an action confirms activity. A per-player session generation guards the
+database aggregate against join/logout/storage races; retries and unavailable storage never report
+a fabricated zero. Consumers must scope the query to their current server and treat exceptions as
+unavailable data. It adds no operator settings and leaves the existing raw-playtime API unchanged.
+
 - [Version 5 Release trailer on Youtube](https://www.youtube.com/watch?v=BS_Ti9zkoRc)
 
 ## API

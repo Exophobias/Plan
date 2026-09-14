@@ -70,7 +70,7 @@ public class AFKTracker {
                 .map(ActiveSession::getLastMovementForAfkCalculation);
     }
 
-    public void usedAfkCommand(UUID playerUUID, long time) {
+    public synchronized void usedAfkCommand(UUID playerUUID, long time) {
         long lastMoved = getLastMovement(playerUUID, time);
         if (lastMoved == IGNORES_AFK) {
             return;
@@ -79,13 +79,21 @@ public class AFKTracker {
         storeLastMovement(playerUUID, time - getAfkThreshold());
     }
 
-    public long performedAction(UUID playerUUID, long time) {
-        long lastMoved = getLastMovement(playerUUID, time);
+    public synchronized long performedAction(UUID playerUUID, long time) {
+        Optional<ActiveSession> session = SessionCache.getCachedSession(playerUUID);
+        if (session.isEmpty()) return 0L;
+        synchronized (session.get()) {
+            return recordAction(playerUUID, time, session.get());
+        }
+    }
+
+    private long recordAction(UUID playerUUID, long time, ActiveSession session) {
+        long lastMoved = session.getLastMovementForAfkCalculation();
         // Ignore afk permission
         if (lastMoved == IGNORES_AFK) {
             return 0L;
         }
-        storeLastMovement(playerUUID, time);
+        session.setLastMovementForAfkCalculation(time);
 
         try {
             if (time - lastMoved < getAfkThreshold()) {
@@ -96,15 +104,14 @@ public class AFKTracker {
             long removeAfkCommandEffect = usedAFKCommand.contains(playerUUID) ? getAfkThreshold() : 0;
             long timeAFK = time - lastMoved - removeAfkCommandEffect;
 
-            SessionCache.getCachedSession(playerUUID)
-                    .ifPresent(session -> session.addAfkTime(timeAFK));
+            session.addAfkTime(timeAFK);
             return timeAFK;
         } finally {
             usedAFKCommand.remove(playerUUID);
         }
     }
 
-    public long loggedOut(UUID uuid, long time) {
+    public synchronized long loggedOut(UUID uuid, long time) {
         long timeAFK = performedAction(uuid, time);
         usedAFKCommand.remove(uuid);
         return timeAFK;

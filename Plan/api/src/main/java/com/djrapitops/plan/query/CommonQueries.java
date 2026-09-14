@@ -44,6 +44,17 @@ public interface CommonQueries {
     long fetchPlaytime(UUID playerUUID, UUID serverUUID, long after, long before);
 
     /**
+     * A coherent current-server activity observation for rewards and eligibility checks.
+     * Includes sessions awaiting storage and the current session exactly once. AFK time is
+     * excluded; the current idle gap is withheld until another action confirms activity.
+     * Database failures or concurrent session transitions throw instead of reporting zero.
+     * Older implementations deliberately refuse this optional API.
+     */
+    default ActivePlaytimeSnapshot fetchActivePlaytimeSnapshot(UUID playerUUID, UUID serverUUID) {
+        throw new UnsupportedOperationException("Active playtime snapshots are unavailable");
+    }
+
+    /**
      * Get playtime of current online session.
      * <p>
      * Requires Capability QUERY_API_ACTIVE_SESSION_PLAYTIME

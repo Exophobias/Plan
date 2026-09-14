@@ -55,7 +55,7 @@ public class ActiveSession {
         return finishedSession;
     }
 
-    public FinishedSession toFinishedSession(long end) {
+    public synchronized FinishedSession toFinishedSession(long end) {
         updateState(end);
         return new FinishedSession(playerUUID, serverUUID, start, end, afkTime, extraData.copy());
     }
@@ -72,7 +72,7 @@ public class ActiveSession {
         return start;
     }
 
-    public void addAfkTime(long time) {
+    public synchronized void addAfkTime(long time) {
         afkTime += time;
     }
 
@@ -144,12 +144,20 @@ public class ActiveSession {
                 '}';
     }
 
-    public long getLastMovementForAfkCalculation() {
+    public synchronized long getLastMovementForAfkCalculation() {
         return lastMovementForAfkCalculation;
     }
 
-    public void setLastMovementForAfkCalculation(long lastMovementForAfkCalculation) {
+    public synchronized void setLastMovementForAfkCalculation(long lastMovementForAfkCalculation) {
         this.lastMovementForAfkCalculation = lastMovementForAfkCalculation;
+    }
+
+    /** Withhold the current idle gap: it may later be classified as AFK retroactively. */
+    public synchronized long confirmedActiveTime(long now) {
+        long duration = Math.max(0, now - start);
+        long idle = lastMovementForAfkCalculation < 0 ? 0
+                : Math.max(0, now - Math.max(start, lastMovementForAfkCalculation));
+        return Math.max(0, duration - Math.max(0, afkTime) - idle);
     }
 
     public boolean isWithin(long after, long before) {

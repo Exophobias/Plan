@@ -6,7 +6,7 @@ repositories {
     }
 }
 
-def paper263 = providers.gradleProperty("paper26.3").isPresent
+def paper263 = providers.gradleProperty("paper26.3").isPresent()
 def bukkitApi = paper263
         ? "io.papermc.paper:paper-api:26.3.build.26-alpha"
         : "com.destroystokyo.paper:paper-api:$paperVersion"

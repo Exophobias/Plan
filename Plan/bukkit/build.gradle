@@ -6,22 +6,27 @@ repositories {
     }
 }
 
+def paper263 = providers.gradleProperty("paper26.3").isPresent
+def bukkitApi = paper263
+        ? "io.papermc.paper:paper-api:26.3.build.26-alpha"
+        : "com.destroystokyo.paper:paper-api:$paperVersion"
+
 dependencies {
     implementation project(":common")
 
     implementation "net.playeranalytics:platform-abstraction-layer-bukkit:$palVersion"
     implementation "org.bstats:bstats-bukkit:$bstatsVersion"
 
-    compileOnly "com.destroystokyo.paper:paper-api:$paperVersion"
+    compileOnly bukkitApi
     compileOnly "me.clip:placeholderapi:$placeholderapiVersion"
 
     testImplementation(testFixtures(project(":common")))
     testImplementation(project(":extensions:adventure"))
-    testImplementation "com.destroystokyo.paper:paper-api:$paperVersion"
+    testImplementation bukkitApi
 }
 
 compileJava {
-    options.release = 17
+    options.release = paper263 ? 25 : 17
 }
 
 processResources {
@@ -29,5 +34,19 @@ processResources {
 
     filesMatching("plugin.yml") {
         expand("version": fullVersion)
+    }
+}
+
+tasks.register('verifyPaperApi') {
+    doLast {
+        def api = configurations.compileClasspath.resolvedConfiguration.resolvedArtifacts.find {
+            it.name == 'paper-api'
+        }
+        def expected = paper263 ? '26.3.build.26-alpha' : paperVersion
+        def expectedGroup = paper263 ? 'io.papermc.paper' : 'com.destroystokyo.paper'
+        if (api == null || api.moduleVersion.id.version != expected || api.moduleVersion.id.group != expectedGroup) {
+            throw new GradleException("Expected ${bukkitApi}, resolved ${api?.moduleVersion?.id}")
+        }
+        logger.lifecycle("paper-api:jar:${api.moduleVersion.id.version}")
     }
 }

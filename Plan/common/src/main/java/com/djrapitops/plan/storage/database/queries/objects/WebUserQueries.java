@@ -60,7 +60,7 @@ public class WebUserQueries {
      */
     public static Query<Optional<ForumPermissions>> fetchLinkedForumPermissions(UUID linkedToUUID) {
         Objects.requireNonNull(linkedToUUID, "linkedToUUID");
-        String sql = "SELECT s.id, g.group_name, p.permission, gtp.permission_id AS linked_permission_id,"
+        String sql = "SELECT s.id, g.id AS group_id, g.group_name, p.permission, gtp.permission_id AS linked_permission_id,"
                 + " (SELECT COUNT(*) FROM " + SecurityTable.TABLE_NAME
                 + " linked WHERE linked.linked_to_uuid=s.linked_to_uuid) AS linked_accounts"
                 + " FROM " + SecurityTable.TABLE_NAME + " s"
@@ -76,17 +76,48 @@ public class WebUserQueries {
                         || (row.getObject("linked_permission_id") != null && (permission == null || permission.isBlank()))) {
                     throw new IllegalStateException("Invalid linked Plan permission mapping");
                 }
-                return new ForumPermissionRow(group, permission);
+                return new ForumPermissionRow(row.getLong("group_id"), group, permission);
             }, linkedToUUID);
-            if (rows.isEmpty()) return Optional.empty();
-            if (rows.size() > 4096) throw new IllegalStateException("Linked Plan permissions exceed limit");
-            List<String> permissions = rows.stream().map(ForumPermissionRow::permission)
-                    .filter(Objects::nonNull).distinct().toList();
-            return Optional.of(new ForumPermissions(rows.get(0).group(), permissions));
+            return forumPermissions(rows, "Linked Plan permissions exceed limit");
         };
     }
 
-    private record ForumPermissionRow(String group, String permission) {}
+    /** Resolve one exact current Plan web group without consulting or creating a password account. */
+    public static Query<Optional<ForumPermissions>> fetchForumGroupPermissions(@Untrusted String groupName) {
+        Objects.requireNonNull(groupName, "groupName");
+        String sql = "SELECT g.id AS group_id, g.group_name, p.permission, gtp.permission_id AS linked_permission_id"
+                + " FROM " + WebGroupTable.TABLE_NAME + " g"
+                + " LEFT JOIN " + WebGroupToPermissionTable.TABLE_NAME + " gtp ON gtp.group_id=g.id"
+                + " LEFT JOIN " + WebPermissionTable.TABLE_NAME + " p ON p.id=gtp.permission_id"
+                + " WHERE g.group_name=? ORDER BY g.id,p.id LIMIT 4097";
+        return db -> {
+            List<ForumPermissionRow> rows = db.queryList(sql, row -> {
+                String group = row.getString("group_name");
+                String permission = row.getString("permission");
+                if (group == null || group.isBlank() || !groupName.equals(group)
+                        || (row.getObject("linked_permission_id") != null && (permission == null || permission.isBlank()))) {
+                    throw new IllegalStateException("Invalid configured Plan permission mapping");
+                }
+                return new ForumPermissionRow(row.getLong("group_id"), group, permission);
+            }, groupName);
+            return forumPermissions(rows, "Configured Plan permissions exceed limit");
+        };
+    }
+
+    private static Optional<ForumPermissions> forumPermissions(List<ForumPermissionRow> rows, String limitError) {
+        if (rows.isEmpty()) return Optional.empty();
+        if (rows.size() > 4096) throw new IllegalStateException(limitError);
+        long groupId = rows.get(0).groupId();
+        String group = rows.get(0).group();
+        if (rows.stream().anyMatch(row -> row.groupId() != groupId || !group.equals(row.group()))) {
+            throw new IllegalStateException("Ambiguous Plan permission group");
+        }
+        List<String> permissions = rows.stream().map(ForumPermissionRow::permission)
+                .filter(Objects::nonNull).distinct().toList();
+        return Optional.of(new ForumPermissions(group, permissions));
+    }
+
+    private record ForumPermissionRow(long groupId, String group, String permission) {}
 
     public static Query<Optional<User>> fetchUser(@Untrusted String username) {
         String sql = SELECT +

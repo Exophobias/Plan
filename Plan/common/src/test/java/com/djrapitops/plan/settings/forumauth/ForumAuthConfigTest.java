@@ -88,7 +88,8 @@ class ForumAuthConfigTest {
         assertEquals(1209600, config.getSessionSeconds());
         assertEquals(60, config.getRecheckSeconds());
         assertEquals(5, config.getTimeoutSeconds());
-        assertEquals(2, config.getInstalledVersion());
+        assertEquals(3, config.getInstalledVersion());
+        assertTrue(config.getSubjectWebGroups().isEmpty());
         assertEquals("created", config.getState());
         assertEquals(template(), Files.readString(file()));
         assertTrue(backups().isEmpty());
@@ -97,7 +98,7 @@ class ForumAuthConfigTest {
 
     @Test
     void currentFileDoesNotRewriteAdministratorFormatting() throws IOException {
-        String current = "# Administrator comment\r\nconfig-version: 2\r\nsession-seconds: 123\r\n";
+        String current = "# Administrator comment\r\nconfig-version: 3\r\nsession-seconds: 123\r\n";
         Files.writeString(file(), current);
         ForumAuthConfig config = ForumAuthConfig.load(file());
         assertEquals(123, config.getSessionSeconds());
@@ -110,35 +111,96 @@ class ForumAuthConfigTest {
     void emptyMappingIsAnExplicitLegacyConfiguration() throws IOException {
         Files.writeString(file(), "{}\n");
         assertEquals("migrated", ForumAuthConfig.load(file()).getState());
-        assertEquals("{}\n", Files.readString(backups().get(0)));
-        assertEquals(900,ForumAuthConfig.load(file()).getSessionSeconds());
+        assertEquals(900, ForumAuthConfig.load(file()).getSessionSeconds());
+        assertTrue(backups().isEmpty());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", "session-seconds: 900\n", "session-seconds: 123\n"})
-    void schemaOnePreservesExistingDurationAndUnknownsWithExactPrivateBackup(String duration) throws IOException {
+    void schemaOnePreservesExistingDurationAndUnknownsWithoutBackup(String duration) throws IOException {
         String original = "config-version: 1\n" + duration + "extension: {keep: true}\nclient-secret: '" + "s".repeat(43) + "'\n";
         Files.writeString(file(),original);
         ForumAuthConfig migrated = ForumAuthConfig.load(file());
-        assertEquals(2,migrated.getInstalledVersion());
+        assertEquals(3,migrated.getInstalledVersion());
         assertEquals(duration.contains("123") ? 123 : 900,migrated.getSessionSeconds());
         assertEquals("s".repeat(43),migrated.getClientSecret());
-        assertEquals(original,Files.readString(backups().get(0)));
-        assertOwnerOnly(backups().get(0));
         assertEquals(Map.of("keep",true),((Map<?,?>)new Yaml().load(Files.readString(file()))).get("extension"));
         String installed = Files.readString(file());
         assertEquals("current",ForumAuthConfig.load(file()).getState());
         assertEquals(installed,Files.readString(file()));
-        assertEquals(1,backups().size());
+        assertTrue(backups().isEmpty());
     }
 
     @ParameterizedTest
     @ValueSource(ints = {1,900,901,1209600})
     void currentSchemaAcceptsBoundedExplicitSessionDurations(int duration) throws IOException {
-        String original = "config-version: 2\nsession-seconds: " + duration + "\n";
+        String original = "config-version: 3\nsession-seconds: " + duration + "\n";
         Files.writeString(file(),original);
         assertEquals(duration,ForumAuthConfig.load(file()).getSessionSeconds());
         assertEquals(original,Files.readString(file()));
+    }
+
+    @Test
+    void schemaTwoAdoptsEmptySubjectMapWithoutBackup() throws IOException {
+        String original = "config-version: 2\nsession-seconds: 123\nextension: {keep: true}\nclient-secret: '"
+                + "s".repeat(43) + "'\n";
+        Files.writeString(file(), original);
+
+        ForumAuthConfig migrated = ForumAuthConfig.load(file());
+
+        assertEquals(3, migrated.getInstalledVersion());
+        assertTrue(migrated.getSubjectWebGroups().isEmpty());
+        assertEquals(123, migrated.getSessionSeconds());
+        Map<String, Object> installed = new Yaml().load(Files.readString(file()));
+        assertEquals(Map.of(), installed.get("subject-web-groups"));
+        assertEquals(Map.of("keep", true), installed.get("extension"));
+        assertTrue(backups().isEmpty());
+    }
+
+    @Test
+    void currentSchemaAcceptsImmutableSubjectToExistingGroupNames() throws IOException {
+        String original = "config-version: 3\nsubject-web-groups:\n  '1': 'admin'\n  '42': 'reports.staff'\n";
+        Files.writeString(file(), original);
+
+        ForumAuthConfig config = ForumAuthConfig.load(file());
+
+        assertEquals(Map.of("1", "admin", "42", "reports.staff"), config.getSubjectWebGroups());
+        assertThrows(UnsupportedOperationException.class,
+                () -> config.getSubjectWebGroups().put("43", "admin"));
+        assertEquals(original, Files.readString(file()));
+        assertTrue(backups().isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "subject-web-groups: []", "subject-web-groups: admin", "subject-web-groups: null",
+            "subject-web-groups: {1: admin}", "subject-web-groups: {'0': admin}",
+            "subject-web-groups: {'01': admin}", "subject-web-groups: {'-1': admin}",
+            "subject-web-groups: {'1': ''}", "subject-web-groups: {'1': 'admin group'}",
+            "subject-web-groups: {'1': [admin]}"
+    })
+    void invalidSubjectWebGroupMappingsAreRejectedWithoutWrites(String mapping) throws IOException {
+        String source = "config-version: 3\n" + mapping + "\n";
+        Files.writeString(file(), source);
+
+        assertThrows(IOException.class, () -> ForumAuthConfig.load(file()));
+
+        assertEquals(source, Files.readString(file()));
+        assertTrue(backups().isEmpty());
+    }
+
+    @Test
+    void subjectWebGroupMappingHasABoundedEntryCount() throws IOException {
+        StringBuilder source = new StringBuilder("config-version: 3\nsubject-web-groups:\n");
+        for (int subject = 1; subject <= 257; subject++) {
+            source.append("  '").append(subject).append("': admin\n");
+        }
+        Files.writeString(file(), source);
+
+        assertThrows(IOException.class, () -> ForumAuthConfig.load(file()));
+
+        assertEquals(source.toString(), Files.readString(file()));
+        assertTrue(backups().isEmpty());
     }
 
     @ParameterizedTest
@@ -159,9 +221,7 @@ class ForumAuthConfigTest {
         assertEquals(secret, config.getClientSecret());
         assertEquals(12, config.getRecheckSeconds());
         assertEquals("migrated", config.getState());
-        assertEquals(1, backups().size());
-        assertArrayEquals(original.getBytes(StandardCharsets.UTF_8), Files.readAllBytes(backups().get(0)));
-        assertOwnerOnly(backups().get(0));
+        assertTrue(backups().isEmpty());
         assertOwnerOnly(file());
 
         String migrated = Files.readString(file());
@@ -176,7 +236,7 @@ class ForumAuthConfigTest {
         assertFalse(migrated.contains("Old administrator comment"));
         assertEquals("current", ForumAuthConfig.load(file()).getState());
         assertEquals(migrated, Files.readString(file()));
-        assertEquals(1, backups().size());
+        assertTrue(backups().isEmpty());
     }
 
     @ParameterizedTest
@@ -184,7 +244,7 @@ class ForumAuthConfigTest {
             "config-version:", "config-version: null", "config-version: ~", "config-version: ''",
             "config-version: '1'", "config-version: \"1\"", "'config-version': 1", "config-version: -1",
             "config-version: 1.0", "config-version: false", "config-version: 01", "config-version: +1",
-            "config-version: 0x1", "config-version: 1_0", "config-version: 3", "config-version: 2147483648",
+            "config-version: 0x1", "config-version: 1_0", "config-version: 4", "config-version: 2147483648",
             "config-version: !!int 1", "!!str config-version: 1", "config-version: &version 1",
             "config-version: 0\nconfig-version: 1", "config-version: 0\n'config-version': 1",
             "config-version: [1]", "config-version: {x: 1}", "secret: null", "secret:",
@@ -235,14 +295,14 @@ class ForumAuthConfigTest {
     }
 
     @Test
-    void atomicWriteFailureKeepsOriginalAndExactBackup() throws IOException {
+    void atomicWriteFailureKeepsOriginalWithoutBackup() throws IOException {
         byte[] original = "enabled: false\n".getBytes(StandardCharsets.UTF_8);
         Files.write(file(), original);
         assertThrows(IOException.class, () -> ForumAuthConfigLoader.load(file(), (target, candidate, expected) -> {
             throw new AtomicMoveNotSupportedException("", "", "synthetic failure");
         }));
         assertArrayEquals(original, Files.readAllBytes(file()));
-        assertArrayEquals(original, Files.readAllBytes(backups().get(0)));
+        assertTrue(backups().isEmpty());
     }
 
     @Test

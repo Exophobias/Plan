@@ -13,4 +13,6 @@ public interface ForumSessionStore {
     default String playerName(UUID uuid) throws IOException { return uuid.toString(); }
     /** Empty means no linked local account; ambiguous or invalid mappings must throw. */
     default Optional<ForumPermissions> linkedPermissions(UUID uuid) throws IOException { return Optional.empty(); }
+    /** Empty means the configured group is missing; invalid or ambiguous groups must throw. */
+    default Optional<ForumPermissions> groupPermissions(String group) throws IOException { return Optional.empty(); }
 }

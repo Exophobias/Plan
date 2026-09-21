@@ -25,7 +25,7 @@ import java.util.Map;
 /** Immutable settings owned exclusively by the independent forum-auth.yml schema. */
 public final class ForumAuthConfig {
 
-    public static final int CURRENT_VERSION = 2;
+    public static final int CURRENT_VERSION = 3;
     public static final int MAX_SESSION_SECONDS = 14 * 24 * 60 * 60;
     private final boolean enabled;
     private final String forumUrl;
@@ -35,9 +35,10 @@ public final class ForumAuthConfig {
     private final int sessionSeconds;
     private final int recheckSeconds;
     private final int timeoutSeconds;
+    private final Map<String, String> subjectWebGroups;
     private final String state;
 
-    ForumAuthConfig(Map<String, String> values, String state) throws IOException {
+    ForumAuthConfig(Map<String, String> values, Map<String, String> subjectWebGroups, String state) throws IOException {
         enabled = switch (values.get("enabled")) {
             case "true" -> true;
             case "false" -> false;
@@ -61,6 +62,7 @@ public final class ForumAuthConfig {
         sessionSeconds = bounded(values, "session-seconds", 1, MAX_SESSION_SECONDS);
         recheckSeconds = bounded(values, "recheck-seconds", 1, 60);
         timeoutSeconds = bounded(values, "timeout-seconds", 1, 10);
+        this.subjectWebGroups = Map.copyOf(subjectWebGroups);
         this.state = state;
     }
 
@@ -111,6 +113,7 @@ public final class ForumAuthConfig {
     public int getSessionSeconds() { return sessionSeconds; }
     public int getRecheckSeconds() { return recheckSeconds; }
     public int getTimeoutSeconds() { return timeoutSeconds; }
+    public Map<String, String> getSubjectWebGroups() { return subjectWebGroups; }
     public int getInstalledVersion() { return CURRENT_VERSION; }
     public String getState() { return state; }
 }

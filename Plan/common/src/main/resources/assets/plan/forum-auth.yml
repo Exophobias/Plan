@@ -1,7 +1,7 @@
 # Forum account sign-in is optional and independent of Plan's main configuration.
 # Configure the matching NamelessMC broker client before enabling this feature.
 # Unknown extension keys are preserved; invalid or ambiguous YAML is rejected unchanged.
-config-version: 2
+config-version: 3
 enabled: false
 # Canonical HTTPS forum origin, without a trailing slash.
 forum-url: 'https://forums.patriam.cc'
@@ -18,3 +18,6 @@ session-seconds: 1209600
 recheck-seconds: 60
 # Each broker request uses this timeout (1-10 seconds).
 timeout-seconds: 5
+# Optional Plan authorization keyed only by the configured forum's immutable numeric subject.
+# Values are existing Plan web group names; absent subjects retain the normal linked/self policy.
+subject-web-groups: {}

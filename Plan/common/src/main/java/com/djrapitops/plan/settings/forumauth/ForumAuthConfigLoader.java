@@ -51,7 +51,7 @@ import java.util.Set;
 
 import static com.djrapitops.plan.settings.forumauth.ForumAuthConfig.invalid;
 
-/** Strict physical parsing and explicit sequential migrations: 0 -> 1 -> 2. */
+/** Strict physical parsing and explicit sequential migrations: 0 -> 1 -> 2 -> 3. */
 final class ForumAuthConfigLoader {
 
     private static final String RESOURCE = "/assets/plan/forum-auth.yml";
@@ -118,6 +118,7 @@ final class ForumAuthConfigLoader {
                                 new ScalarNode(Tag.INT, "900", null, null, DumperOptions.ScalarStyle.PLAIN)));
                     }
                 }
+                case 2 -> { /* 2 -> 3 adopts an empty explicit forum-subject authorization map. */ }
                 default -> throw invalid("missing sequential schema migration");
             }
         }
@@ -128,7 +129,6 @@ final class ForumAuthConfigLoader {
         byte[] replacement = serialize(candidate);
         settings(parse(replacement), "migrated");
         checkSource(file, source);
-        ForumAuthFiles.backup(file, source, sourceVersion);
         writer.write(file, replacement, source);
         return activate(file, replacement, "migrated");
     }
@@ -300,8 +300,13 @@ final class ForumAuthConfigLoader {
                 "client-id", Tag.STR, "client-secret", Tag.STR, "callback-url", Tag.STR,
                 "session-seconds", Tag.INT, "recheck-seconds", Tag.INT, "timeout-seconds", Tag.INT);
         Map<String, String> values = new LinkedHashMap<>();
+        Map<String, String> subjectWebGroups = null;
         for (NodeTuple tuple : mapping.getValue()) {
             String key = key(tuple);
+            if ("subject-web-groups".equals(key)) {
+                subjectWebGroups = subjectWebGroups(tuple.getValueNode());
+                continue;
+            }
             if (!types.containsKey(key)) continue;
             if (!(tuple.getValueNode() instanceof ScalarNode value) || !types.get(key).equals(value.getTag())) {
                 throw invalid(key + " has an invalid value type");
@@ -312,6 +317,29 @@ final class ForumAuthConfigLoader {
             values.put(key, value.getValue());
         }
         if (!values.keySet().containsAll(types.keySet())) throw invalid("configuration is missing required settings");
-        return new ForumAuthConfig(values, state);
+        if (subjectWebGroups == null) throw invalid("configuration is missing subject-web-groups");
+        return new ForumAuthConfig(values, subjectWebGroups, state);
+    }
+
+    private static Map<String, String> subjectWebGroups(Node node) throws IOException {
+        if (!(node instanceof MappingNode mapping)) {
+            throw invalid("subject-web-groups must be a mapping");
+        }
+        if (mapping.getValue().size() > 256) {
+            throw invalid("subject-web-groups must contain at most 256 entries");
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (NodeTuple tuple : mapping.getValue()) {
+            String subject = key(tuple);
+            if (!subject.matches("[1-9][0-9]{0,18}")) {
+                throw invalid("subject-web-groups keys must be canonical immutable forum subjects");
+            }
+            if (!(tuple.getValueNode() instanceof ScalarNode group) || !Tag.STR.equals(group.getTag())
+                    || !group.getValue().matches("[A-Za-z0-9_.-]{1,100}")) {
+                throw invalid("subject-web-groups values must be valid Plan web group names");
+            }
+            result.put(subject, group.getValue());
+        }
+        return result;
     }
 }

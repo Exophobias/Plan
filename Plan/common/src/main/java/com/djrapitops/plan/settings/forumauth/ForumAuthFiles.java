@@ -39,18 +39,6 @@ final class ForumAuthFiles {
 
     private ForumAuthFiles() { }
 
-    static void backup(Path file, byte[] source, int version) throws IOException {
-        Path backup = privateTemporary(file, ".v" + version + ".bak-");
-        boolean complete = false;
-        try {
-            writeForced(backup, source);
-            ForumAuthConfigLoader.checkSource(file, source);
-            complete = true;
-        } finally {
-            if (!complete) Files.deleteIfExists(backup);
-        }
-    }
-
     static void replace(Path file, byte[] replacement, byte[] expected) throws IOException {
         Path temporary = privateTemporary(file, ".tmp-");
         try {

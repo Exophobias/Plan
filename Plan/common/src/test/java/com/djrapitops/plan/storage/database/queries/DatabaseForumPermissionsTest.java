@@ -52,6 +52,62 @@ public interface DatabaseForumPermissionsTest extends DatabaseTestPreparer {
     }
 
     @Test
+    default void configuredForumGroupReadsExactGrantsWithoutCreatingPasswordAccount() throws IOException {
+        executeTransactions(new StoreWebGroupTransaction(FORUM_LOCAL_GROUP, FORUM_LOCAL_GRANTS));
+
+        ForumPermissions permissions = new DatabaseForumSessionStore(dbSystem())
+                .groupPermissions(FORUM_LOCAL_GROUP).orElseThrow();
+
+        assertEquals(FORUM_LOCAL_GROUP, permissions.group());
+        assertEquals(Set.copyOf(FORUM_LOCAL_GRANTS), Set.copyOf(permissions.permissions()));
+        assertTrue(db().query(WebUserQueries.fetchAllUsers()).isEmpty());
+    }
+
+    @Test
+    default void configuredForumGroupDistinguishesMissingFromExistingEmptyGroup() throws IOException {
+        DatabaseForumSessionStore store = new DatabaseForumSessionStore(dbSystem());
+        assertTrue(store.groupPermissions("missing-group").isEmpty());
+
+        executeTransactions(new StoreWebGroupTransaction("empty-configured-group", List.of()));
+
+        ForumPermissions empty = store.groupPermissions("empty-configured-group").orElseThrow();
+        assertEquals("empty-configured-group", empty.group());
+        assertTrue(empty.permissions().isEmpty());
+    }
+
+    @Test
+    default void configuredForumGroupObservesPermissionChangesOnNextLookup() throws IOException {
+        executeTransactions(new StoreWebGroupTransaction(FORUM_LOCAL_GROUP, FORUM_LOCAL_GRANTS));
+        DatabaseForumSessionStore store = new DatabaseForumSessionStore(dbSystem());
+        assertEquals(Set.copyOf(FORUM_LOCAL_GRANTS),
+                Set.copyOf(store.groupPermissions(FORUM_LOCAL_GROUP).orElseThrow().permissions()));
+
+        executeTransactions(new StoreWebGroupTransaction(FORUM_LOCAL_GROUP, List.of("access.player.self")));
+
+        assertEquals(List.of("access.player.self"),
+                store.groupPermissions(FORUM_LOCAL_GROUP).orElseThrow().permissions());
+    }
+
+    @Test
+    default void configuredForumGroupLookupUsesAParameterInsteadOfGroupNameSql() throws IOException {
+        executeTransactions(new StoreWebGroupTransaction(FORUM_LOCAL_GROUP, FORUM_LOCAL_GRANTS));
+        DatabaseForumSessionStore store = new DatabaseForumSessionStore(dbSystem());
+
+        assertTrue(store.groupPermissions(FORUM_LOCAL_GROUP + "' OR 1=1 --").isEmpty());
+        assertTrue(store.groupPermissions(FORUM_LOCAL_GROUP).isPresent());
+        assertTrue(db().query(WebUserQueries.fetchAllUsers()).isEmpty());
+    }
+
+    @Test
+    default void configuredForumGroupWithDanglingPermissionFailsClosed() {
+        executeTransactions(new StoreWebGroupTransaction(FORUM_LOCAL_GROUP, FORUM_LOCAL_GRANTS));
+        makeForumGroupPermissionDangling();
+
+        assertThrows(IOException.class,
+                () -> new DatabaseForumSessionStore(dbSystem()).groupPermissions(FORUM_LOCAL_GROUP));
+    }
+
+    @Test
     default void forumPermissionsUniqueUuidInheritsExactGrantsWithoutPlayerNameRow() throws IOException {
         User local = storeForumLinkedAccount(FORUM_LOCAL_OWNER, playerUUID, FORUM_LOCAL_GROUP, FORUM_LOCAL_GRANTS);
         assertTrue(db().queryOptional("SELECT " + UsersTable.USER_UUID + " FROM " + UsersTable.TABLE_NAME
@@ -151,6 +207,21 @@ public interface DatabaseForumPermissionsTest extends DatabaseTestPreparer {
                 try {
                     execute("UPDATE " + SecurityTable.TABLE_NAME + " SET " + SecurityTable.GROUP_ID
                             + "=2147483647 WHERE " + SecurityTable.USERNAME + "='" + FORUM_LOCAL_OWNER + "'");
+                } finally {
+                    if (dbType == DBType.MYSQL) execute("SET FOREIGN_KEY_CHECKS=1");
+                }
+            }
+        });
+    }
+
+    /** Model an imported/corrupt permission association without weakening production validation. */
+    private void makeForumGroupPermissionDangling() {
+        executeTransactions(new Transaction() {
+            @Override protected void performOperations() {
+                if (dbType == DBType.MYSQL) execute("SET FOREIGN_KEY_CHECKS=0");
+                try {
+                    execute("UPDATE plan_web_group_to_permission SET permission_id=2147483647 WHERE group_id=(SELECT id"
+                            + " FROM plan_web_group WHERE group_name='" + FORUM_LOCAL_GROUP + "')");
                 } finally {
                     if (dbType == DBType.MYSQL) execute("SET FOREIGN_KEY_CHECKS=1");
                 }

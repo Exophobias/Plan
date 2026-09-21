@@ -72,6 +72,10 @@ class ForumAuthServiceTest {
     }
 
     private static ForumAuthConfig config(String secret) {
+        return config(secret, Map.of());
+    }
+
+    private static ForumAuthConfig config(String secret, Map<String, String> subjectWebGroups) {
         ForumAuthConfig config = mock(ForumAuthConfig.class);
         when(config.isEnabled()).thenReturn(true);
         when(config.getForumUrl()).thenReturn(ISSUER);
@@ -81,6 +85,7 @@ class ForumAuthServiceTest {
         when(config.getAuthorizeUrl()).thenReturn(URI.create(ISSUER + "/plan-auth/authorize"));
         when(config.getSessionSeconds()).thenReturn(900);
         when(config.getRecheckSeconds()).thenReturn(60);
+        when(config.getSubjectWebGroups()).thenReturn(subjectWebGroups);
         return config;
     }
 
@@ -158,6 +163,72 @@ class ForumAuthServiceTest {
         assertEquals("", user.getPasswordHash());
         assertFalse(user.doesPasswordMatch(""));
         assertEquals("/", login.playerPath());
+    }
+
+    @Test
+    void immutableForumSubjectUsesExactCurrentConfiguredGroupWithoutLocalAccount() throws IOException {
+        ForumPermissions admin = new ForumPermissions("admin", List.of("access", "data", "page", "manage.users"));
+        sessions.groups.put("admin", admin);
+        service = new ForumAuthService(config("secret-for-test-client-".repeat(3), Map.of("42", "admin")),
+                broker, sessions, clock);
+
+        User user = service.authenticate(complete(service.begin()).cookie());
+
+        assertNotNull(user);
+        assertEquals(admin.permissions(), user.getPermissions());
+        assertEquals(admin.group(), user.getPermissionGroup());
+        assertEquals("admin", sessions.permissionLookupGroup);
+        assertNull(sessions.permissionLookupUuid);
+        assertEquals(PLAYER, user.getLinkedToUUID());
+        assertEquals("forum", user.toWebUser().getAuthenticationProvider().orElseThrow());
+        assertEquals("", user.getPasswordHash());
+        assertFalse(user.doesPasswordMatch(""));
+    }
+
+    @Test
+    void mappingForAnotherImmutableSubjectDoesNotElevateTheCurrentForumAccount() throws IOException {
+        sessions.groups.put("admin", new ForumPermissions("admin", List.of("access", "manage.users")));
+        service = new ForumAuthService(config("secret-for-test-client-".repeat(3), Map.of("7", "admin")),
+                broker, sessions, clock);
+
+        User user = service.authenticate(complete(service.begin()).cookie());
+
+        assertNotNull(user);
+        assertEquals(ForumAuthService.SELF_PERMISSIONS, user.getPermissions());
+        assertNull(sessions.permissionLookupGroup);
+        assertEquals(PLAYER, sessions.permissionLookupUuid);
+    }
+
+    @Test
+    void missingConfiguredGroupOrPermissionStorageFailureFailsClosed() throws IOException {
+        ForumAuthConfig mapped = config("secret-for-test-client-".repeat(3), Map.of("42", "admin"));
+        service = new ForumAuthService(mapped, broker, sessions, clock);
+        String missingGroupCookie = complete(service.begin()).cookie();
+        assertNull(service.authenticate(missingGroupCookie));
+        assertNull(sessions.permissionLookupUuid);
+
+        sessions.groups.put("admin", new ForumPermissions("admin", List.of("access", "manage.users")));
+        String unavailableCookie = complete(service.begin()).cookie();
+        sessions.permissionsUnavailable = true;
+        assertNull(service.authenticate(unavailableCookie));
+        assertNull(sessions.permissionLookupUuid);
+    }
+
+    @Test
+    void configuredGroupPermissionChangesApplyOnTheNextRequest() throws IOException {
+        sessions.groups.put("admin", new ForumPermissions("admin", List.of("access", "manage.users")));
+        service = new ForumAuthService(config("secret-for-test-client-".repeat(3), Map.of("42", "admin")),
+                broker, sessions, clock);
+        String cookie = complete(service.begin()).cookie();
+        assertTrue(service.authenticate(cookie).toWebUser().hasPermission("manage.users"));
+
+        sessions.groups.put("admin", new ForumPermissions("admin", List.of("access.player.self")));
+
+        User restricted = service.authenticate(cookie);
+        assertNotNull(restricted);
+        assertEquals(List.of("access.player.self"), restricted.getPermissions());
+        assertFalse(restricted.toWebUser().hasPermission("manage.users"));
+        assertNull(sessions.permissionLookupUuid);
     }
 
     @Test
@@ -401,7 +472,7 @@ class ForumAuthServiceTest {
     }
 
     private void writeConfiguration(boolean enabled) throws IOException {
-        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 2\nenabled: " + enabled
+        Files.writeString(directory.resolve("forum-auth.yml"), "config-version: 3\nenabled: " + enabled
                 + "\nforum-url: " + config.getForumUrl() + "\nclient-id: " + config.getClientId()
                 + "\nclient-secret: " + config.getClientSecret() + "\ncallback-url: " + config.getCallbackUrl()
                 + "\nsession-seconds: " + config.getSessionSeconds() + "\n");
@@ -510,6 +581,17 @@ class ForumAuthServiceTest {
         ForumAuthService.LoginResult login = complete(service.begin());
         ForumAuthService rotated = new ForumAuthService(config("rotated-secret-".repeat(4)), broker, sessions, clock);
         assertNull(rotated.authenticate(login.cookie()));
+        assertTrue(sessions.rows.isEmpty());
+    }
+
+    @Test
+    void subjectGroupMappingChangeInvalidatesPersistedSession() throws IOException {
+        ForumAuthService.LoginResult login = complete(service.begin());
+        ForumAuthConfig mapped = config(config.getClientSecret(), Map.of("42", "admin"));
+
+        ForumAuthService changed = new ForumAuthService(mapped, broker, sessions, clock);
+
+        assertNull(changed.authenticate(login.cookie()));
         assertTrue(sessions.rows.isEmpty());
     }
 
@@ -700,11 +782,13 @@ class ForumAuthServiceTest {
     private static final class MemorySessions implements ForumSessionStore {
         final Map<String, Session> rows = new ConcurrentHashMap<>();
         final Map<UUID, ForumPermissions> permissions = new ConcurrentHashMap<>();
+        final Map<String, ForumPermissions> groups = new ConcurrentHashMap<>();
         boolean unavailable;
         boolean removeUnavailable;
         boolean removeAllUnavailable;
         boolean permissionsUnavailable;
         UUID permissionLookupUuid;
+        String permissionLookupGroup;
         String playerName;
         int removeAllCalls;
         Runnable afterSave = () -> {};
@@ -731,6 +815,13 @@ class ForumAuthServiceTest {
             permissionLookupUuid = uuid;
             beforePermissions.run();
             return Optional.ofNullable(permissions.get(uuid));
+        }
+        public Optional<ForumPermissions> groupPermissions(String group) throws IOException {
+            available();
+            if (permissionsUnavailable) throw new IOException("private permission-storage diagnostics");
+            permissionLookupGroup = group;
+            beforePermissions.run();
+            return Optional.ofNullable(groups.get(group));
         }
     }
 

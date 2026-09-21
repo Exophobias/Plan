@@ -117,8 +117,12 @@ public final class ForumAuthService {
 
     synchronized void configure(ForumAuthConfig candidate, ForumBroker candidateBroker) {
         if (invalidationRequired) throw new IllegalStateException("Forum session invalidation must complete before enabling");
+        StringBuilder authorization = new StringBuilder();
+        candidate.getSubjectWebGroups().entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> authorization.append('\n').append(entry.getKey()).append('=').append(entry.getValue()));
         String configHash = hash(candidate.getForumUrl() + "\n" + candidate.getClientId() + "\n" + candidate.getClientSecret()
-                + "\n" + candidate.getCallbackUrl() + "\n" + candidate.getSessionSeconds() + "\n" + candidate.getRecheckSeconds());
+                + "\n" + candidate.getCallbackUrl() + "\n" + candidate.getSessionSeconds() + "\n" + candidate.getRecheckSeconds()
+                + authorization);
         Generation next = new Generation(candidate, candidateBroker, configHash);
         generation = next;
         pending.invalidateAll();
@@ -247,9 +251,12 @@ public final class ForumAuthService {
             ForumIdentity identity = session.identity();
             String username = "forum:" + hash(identity.issuer()).substring(0, 12) + ":" + identity.subject();
             String playerName = sessions.playerName(identity.minecraftUUID());
-            // Read current local authority on every request. Broker eligibility caches never cache
-            // Plan permissions; exact UUID ownership is independent of mutable account/player names.
-            ForumPermissions permissions = sessions.linkedPermissions(identity.minecraftUUID())
+            // Read current Plan authority on every request. Explicit immutable-subject mappings are
+            // Plan-owned and do not trust forum roles; unmapped users retain the UUID-linked policy.
+            String mappedGroup = active.config().getSubjectWebGroups().get(identity.subject());
+            ForumPermissions permissions = mappedGroup != null
+                    ? sessions.groupPermissions(mappedGroup).orElseThrow(() -> new IOException("Configured Plan group is missing"))
+                    : sessions.linkedPermissions(identity.minecraftUUID())
                     .orElseGet(() -> new ForumPermissions("forum-self", SELF_PERMISSIONS));
             synchronized (this) {
                 if (generation != active || isRevoked(key) || !current.accepted()

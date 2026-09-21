@@ -19,7 +19,7 @@ package com.djrapitops.plan.delivery.webserver.auth.forum;
 import java.util.List;
 import java.util.Objects;
 
-/** Current permissions of one explicitly UUID-linked Plan account, without password material. */
+/** Current permissions of one Plan-owned forum authorization source, without password material. */
 public record ForumPermissions(String group, List<String> permissions) {
     public ForumPermissions {
         Objects.requireNonNull(group, "group");

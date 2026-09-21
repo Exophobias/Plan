@@ -118,4 +118,14 @@ public final class DatabaseForumSessionStore implements ForumSessionStore {
             throw new IOException("Linked Plan permissions unavailable");
         }
     }
+
+    @Override
+    public Optional<ForumPermissions> groupPermissions(String group) throws IOException {
+        try {
+            // The configured subject mapping selects a group, never a permission snapshot.
+            return databases.getDatabase().query(WebUserQueries.fetchForumGroupPermissions(group));
+        } catch (RuntimeException failure) {
+            throw new IOException("Configured Plan permissions unavailable");
+        }
+    }
 }

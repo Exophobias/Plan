@@ -61,7 +61,8 @@ public class StoreMinecraftStatisticsValuesTransaction extends Transaction {
                 statement.setInt(3, userId);
                 statement.setInt(4, serverId);
                 for (Integer id : existingStatisticIds) {
-                    statement.setInt(1, valuesById.get(id));
+                    // A current stats file can omit a statistic that was stored earlier.
+                    statement.setInt(1, valuesById.getOrDefault(id, 0));
                     statement.setInt(2, id);
                     statement.addBatch();
                 }

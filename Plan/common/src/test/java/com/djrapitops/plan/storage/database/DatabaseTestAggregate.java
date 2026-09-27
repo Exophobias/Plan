@@ -24,6 +24,7 @@ import com.djrapitops.plan.storage.database.queries.objects.KillQueriesTest;
 import com.djrapitops.plan.storage.database.queries.objects.PluginMetadataQueriesTest;
 import com.djrapitops.plan.storage.database.transactions.commands.ChangeUserUUIDTransactionTest;
 import com.djrapitops.plan.storage.database.transactions.commands.CombineUserTransactionTest;
+import com.djrapitops.plan.storage.database.transactions.events.MinecraftStatisticsValuesTransactionTest;
 import com.djrapitops.plan.storage.database.transactions.patches.AfterBadJoinAddressDataCorrectionPatchTest;
 import com.djrapitops.plan.storage.database.transactions.patches.BadJoinAddressDataCorrectionPatchTest;
 
@@ -51,6 +52,7 @@ public interface DatabaseTestAggregate extends
         JoinAddressQueriesTest,
         ChangeUserUUIDTransactionTest,
         CombineUserTransactionTest,
+        MinecraftStatisticsValuesTransactionTest,
         ExtensionQueryResultTableDataQueryTest,
         BadJoinAddressDataCorrectionPatchTest,
         AfterBadJoinAddressDataCorrectionPatchTest,

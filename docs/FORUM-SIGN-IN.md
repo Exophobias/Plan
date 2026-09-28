@@ -94,8 +94,10 @@ hostname requires matching registration on both sides.
 
 Pending transactions and cached checks are bounded in memory. Expired durable sessions are removed on
 new session creation. Use the website's bounded purge command for expired broker codes/attempt records.
-The forum consent page requires confirmation and rechecks configured MFA, including for remembered
-forum sessions. When retained, local Plan owner access remains a recovery path if the forum is unavailable.
+The forum consent page reuses a completed native forum session and requires CSRF-protected account
+confirmation. Without a completed session, the forum's normal login authenticates the user first;
+partial authentication cannot authorize Plan. When retained, local Plan owner access remains a
+recovery path if the forum is unavailable.
 
 ## Patriam presentation
 
